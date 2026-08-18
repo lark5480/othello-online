@@ -1,0 +1,72 @@
+# 黑白棋 · 在线对战（Othello Online）
+
+一个零成本部署的黑白棋（Othello / Reversi）网页游戏：两人通过**房间码**联机对战，无需注册登录。前端 React + Vite，后端用 EdgeOne Makers 的 Edge Functions + KV 实现状态同步。
+
+## 功能特性
+
+- 8×8 标准棋盘，木纹棋板主题，黑白子高对比渐变。
+- 房间码创建 / 加入，跨设备实时同步（轮询）。
+- 合法落子自动翻转，带翻转动画。
+- 无合法落子时自动跳过并提示对方；双方均不可落子或棋盘满时判定胜负。
+- **落子提示可配置开关**：联网对战默认关闭（靠棋力，保公平），休闲对局可在对局页手动开启；提示状态按设备保存在 localStorage。
+- 最后落子位置高亮（青色描边），方便追踪局势。
+- 响应式布局，支持键盘聚焦与屏幕阅读器（`aria-label`）。
+
+## 技术栈
+
+| 层 | 技术 |
+|----|------|
+| 前端 | React 18、Vite 6、TypeScript、Tailwind CSS v4 |
+| 后端 | EdgeOne Makers Edge Functions（V8）、KV 存储 |
+| 同步 | 前端轮询（`usePolling`）+ `currentTurn`/`updatedAt` 防并发与陈旧数据 |
+| 测试 | Vitest |
+| 部署 | EdgeOne Makers（GitHub 自动部署 / `edgeone pages deploy`） |
+
+## 快速开始（本地）
+
+```bash
+npm install
+npm run dev
+```
+
+打开两个浏览器窗口（或两台设备），一个创建房间、一个用房间码加入即可对弈。
+本地验证无需配置 EdgeOne / KV——`server/mockApi.ts` 会在 `npm run dev` 时自动挂载一个内存版接口，端点形状与生产一致。
+
+## 构建与部署
+
+```bash
+npm run build     # 产物输出到 dist/
+npm run preview   # 本地预览构建产物
+```
+
+部署到 EdgeOne Makers：
+
+1. 在 EdgeOne 控制台创建 KV 命名空间，绑定项目变量（如 `OTHELLO_KV`）。
+2. 关联 GitHub 仓库自动部署，或执行 `edgeone pages deploy`（构建 `npm run build`、输出 `dist`）。
+3. SPA 路由已在 `edgeone.json` 配置 fallback（`/room/:roomId` 刷新不 404）。
+
+> 详细部署步骤与架构约束见 [`docs/部署指南.md`](docs/部署指南.md)；完整产品需求见 [`docs/需求PRD.md`](docs/需求PRD.md)。
+
+## 项目结构
+
+```
+src/                  前端源码（pages / components / hooks / utils / index.css）
+edge-functions/       服务端 Edge Functions（create / join / state / move / restart）
+server/mockApi.ts     本地免 EdgeOne 验证用的 Vite 中间件
+scripts/              类型剥离自测脚本
+docs/                 需求PRD、部署指南
+edgeone.json          SPA fallback 配置
+```
+
+## 开发与测试
+
+```bash
+npm run typecheck   # 类型检查（tsc --noEmit）
+npm test            # 运行单元测试（vitest）
+```
+
+## 目录约定
+
+- 游戏规则等纯逻辑集中在 `src/utils/gameLogic.ts`，前后端共用；Edge Functions 不得引入 npm 包。
+- 视觉令牌集中在 `src/index.css` 的 `:root`，组件用专属 CSS 类（如 `is-hint` / `is-last`）控制状态样式。
+- 棋子用 CSS 圆形 + 内联 SVG 图标，项目内不使用 emoji 图标。
