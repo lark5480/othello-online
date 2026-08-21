@@ -76,6 +76,15 @@ export default function Home() {
           创建房间
         </button>
 
+        <button
+          type="button"
+          onClick={() => navigate('/ai')}
+          disabled={busy}
+          className="mt-3 w-full rounded-xl border border-neutral-900 py-3 text-sm font-medium text-neutral-900 transition-colors hover:bg-neutral-900 hover:text-white disabled:opacity-60"
+        >
+          人机对战
+        </button>
+
         <div className="my-5 flex items-center gap-3 text-xs text-neutral-400">
           <span className="h-px flex-1 bg-neutral-200" />
           或输入房间码加入

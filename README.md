@@ -9,6 +9,7 @@
 - 合法落子自动翻转，带翻转动画。
 - 无合法落子时自动跳过并提示对方；双方均不可落子或棋盘满时判定胜负。
 - **落子提示可配置开关**：联网对战默认关闭（靠棋力，保公平），休闲对局可在对局页手动开启；提示状态按设备保存在 localStorage。
+- **人机对战（P2）**：单机离线即可挑战 AI，三档难度——简单（随机）、中等（2 层预判）、困难（4 层 Minimax + 剪枝、残局精确）。无需后端 / KV。
 - 最后落子位置高亮（青色描边），方便追踪局势。
 - 响应式布局，支持键盘聚焦与屏幕阅读器（`aria-label`）。
 
@@ -32,6 +33,8 @@ npm run dev
 打开两个浏览器窗口（或两台设备），一个创建房间、一个用房间码加入即可对弈。
 本地验证无需配置 EdgeOne / KV——`server/mockApi.ts` 会在 `npm run dev` 时自动挂载一个内存版接口，端点形状与生产一致。
 
+想挑战电脑？打开 `/ai` 即可与 AI 对战（简单 / 中等 / 困难），同样是纯本地、无需任何后端配置。
+
 ## 构建与部署
 
 ```bash
@@ -51,6 +54,8 @@ npm run preview   # 本地预览构建产物
 
 ```
 src/                  前端源码（pages / components / hooks / utils / index.css）
+                      pages: Home（首页）、Room（联机对局）、AIGame（人机对战）
+                      utils: gameLogic.ts（规则引擎）、ai.ts（AI 对手引擎）、hints.ts（提示开关）
 edge-functions/       服务端 Edge Functions（create / join / state / move / restart）
 server/mockApi.ts     本地免 EdgeOne 验证用的 Vite 中间件
 scripts/              类型剥离自测脚本

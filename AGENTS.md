@@ -26,10 +26,10 @@ npm test           # vitest run
 
 ```
 src/
-  pages/        Home（建/进房间）、Room（对局页，提示开关在此）
+  pages/        Home（建/进房间）、Room（联机对局页，提示开关在此）、AIGame（人机对战页，路由 /ai）
   components/   Board / Cell / GameInfo / icons
   hooks/        usePolling
-  utils/        gameLogic.ts（纯规则引擎，前后端共用）、api.ts、player.ts、hints.ts（提示开关持久化）
+  utils/        gameLogic.ts（纯规则引擎，前后端共用）、ai.ts（AI 对手引擎：Minimax+剪枝、难度分级）、api.ts、player.ts、hints.ts（提示开关持久化）
   index.css     设计令牌 + 棋盘/棋子/提示样式
 edge-functions/api/room/   服务端：create/join/[roomId]/{state,move,restart}
 server/mockApi.ts           Vite 中间件，本地免 EdgeOne 验证（复用 gameLogic + 内存 Map 当 KV）

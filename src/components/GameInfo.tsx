@@ -6,8 +6,12 @@ interface GameInfoProps {
   roomId: string;
   state: GameState;
   myColor: Player | null;
-  copied: boolean;
-  onCopyCode: () => void;
+  copied?: boolean;
+  onCopyCode?: () => void;
+  /** 人机模式：非我方回合且 AI 正在计算时显示「AI 思考中…」 */
+  aiThinking?: boolean;
+  /** 人机模式：标题区副文案（如「人机对战 · 困难」） */
+  subtitle?: string;
 }
 
 export default function GameInfo({
@@ -16,6 +20,8 @@ export default function GameInfo({
   myColor,
   copied,
   onCopyCode,
+  aiThinking = false,
+  subtitle,
 }: GameInfoProps) {
   const { black, white } = countStones(state.board);
   const isMyTurn = myColor !== null && state.currentTurn === myColor;
@@ -26,6 +32,7 @@ export default function GameInfo({
   } else if (state.status === 'playing') {
     if (myColor === null) statusText = '观战中';
     else if (isMyTurn) statusText = '轮到你落子';
+    else if (aiThinking) statusText = 'AI 思考中…';
     else statusText = '等待对方落子…';
   }
 
@@ -35,20 +42,26 @@ export default function GameInfo({
   return (
     <div className="card w-full p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-neutral-500">
-          房间号
-          <span className="ml-2 select-all font-mono text-lg font-semibold tracking-widest text-neutral-900">
-            {roomId}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={onCopyCode}
-          className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-700 transition-colors hover:bg-neutral-50 active:scale-95"
-        >
-          <CopyIcon size={16} />
-          {copied ? '已复制' : '复制'}
-        </button>
+        {subtitle ? (
+          <div className="text-sm font-medium text-neutral-500">{subtitle}</div>
+        ) : (
+          <>
+            <div className="text-sm text-neutral-500">
+              房间号
+              <span className="ml-2 select-all font-mono text-lg font-semibold tracking-widest text-neutral-900">
+                {roomId}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onCopyCode}
+              className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-700 transition-colors hover:bg-neutral-50 active:scale-95"
+            >
+              <CopyIcon size={16} />
+              {copied ? '已复制' : '复制'}
+            </button>
+          </>
+        )}
       </div>
 
       <div className="mt-5 flex items-center justify-center gap-8">

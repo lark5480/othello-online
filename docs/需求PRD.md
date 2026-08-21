@@ -63,11 +63,12 @@
 ## 四、页面结构
 
 ```
-/                  → 首页（创建房间 / 加入房间）
+/                  → 首页（创建房间 / 加入房间 / 人机对战入口）
 /room/:roomId      → 游戏房间页（棋盘 + 状态）
+/ai                → 人机对战页（棋盘 + AI 对手，离线单机）
 ```
 
-共 **2 个页面**，保持极简。
+共 **3 个页面**，保持极简。
 
 > ⚠️ `/room/:roomId` 是前端路由（SPA）。EdgeOne Pages 不会自动把未知路径回退到 `index.html`，**直接刷新或深链会 404**。必须配置 SPA fallback（见 10.4）。
 
@@ -259,6 +260,7 @@ function json(data: unknown, status = 200) {
 │        ♟ Othello Online      │
 │                              │
 │   [ 创建房间 ]               │
+│   [ 人机对战 ]               │
 │                              │
 │   房间码: [______] [加入]    │
 │                              │
@@ -335,7 +337,8 @@ othello-online/
 ├── src/                    # React 前端（Vite 构建到 dist/）
 │   ├── pages/
 │   │   ├── Home.tsx        # 首页
-│   │   └── Room.tsx        # 游戏页
+│   │   ├── Room.tsx        # 游戏页（联机）
+│   │   └── AIGame.tsx     # 人机对战页（/ai，离线单机）
 │   ├── components/
 │   │   ├── Board.tsx       # 棋盘组件
 │   │   ├── Cell.tsx        # 格子组件
@@ -429,7 +432,7 @@ EdgeOne Pages 不会自动把未知前端路由回退到 `index.html`，需二�
 
 ## 十二、后续可扩展（P2）
 
-- [ ] AI 对战模式（Minimax 算法）
+- [x] AI 对战模式（Minimax 算法，难度分级：简单/中等/困难；引擎 `src/utils/ai.ts`，离线单机，详见《AI对战模式.md》）
 - [ ] 观战功能
 - [ ] 对局回放
 - [ ] 落子提示说明：提示为客户端视觉辅助，按设备持久化；若需全局一致的辅助（如房间级 assist 开关）需服务端字段。**solo/AI 模式默认开启提示（见 `getDefaultShowHints`），联网对战默认关闭以保公平。**
