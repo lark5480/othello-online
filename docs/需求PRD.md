@@ -432,7 +432,9 @@ EdgeOne Pages 不会自动把未知前端路由回退到 `index.html`，需二�
 
 ## 十二、后续可扩展（P2）
 
-- [x] AI 对战模式（Minimax 算法，难度分级：简单/中等/困难；引擎 `src/utils/ai.ts`，离线单机，详见《AI对战模式.md》）
+- [x] AI 对战模式（Minimax + 迭代加深，难度分级：简单/中等/困难/大师；引擎 `src/utils/ai.ts`，Web Worker 异步计算 `src/workers/ai.worker.ts`，离线单机，详见《AI对战模式.md》）
+- [x] 落子预览（ghost disc + 翻转高亮）：hover 合法格显示半透明己方棋子和将被翻转的棋子脉冲描边
+- [x] 暗色模式：`prefers-color-scheme` 自动切换设计令牌，全部组件通过语义化 CSS 类适配
 - [ ] 观战功能
 - [ ] 对局回放
 - [ ] 落子提示说明：提示为客户端视觉辅助，按设备持久化；若需全局一致的辅助（如房间级 assist 开关）需服务端字段。**solo/AI 模式默认开启提示（见 `getDefaultShowHints`），联网对战默认关闭以保公平。**

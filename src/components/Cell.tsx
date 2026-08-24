@@ -1,15 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import { BLACK, EMPTY, type Stone } from '../utils/gameLogic';
+import { BLACK, EMPTY, type Player, type Stone } from '../utils/gameLogic';
 
 interface CellProps {
   value: Stone;
   isHint: boolean;
   isLast: boolean;
   interactive: boolean;
+  ghost?: boolean;
+  willFlip?: boolean;
+  ghostColor?: Player | null;
   onClick: () => void;
 }
 
-export default function Cell({ value, isHint, isLast, interactive, onClick }: CellProps) {
+export default function Cell({
+  value,
+  isHint,
+  isLast,
+  interactive,
+  ghost = false,
+  willFlip = false,
+  ghostColor,
+  onClick,
+}: CellProps) {
   const prev = useRef<Stone>(value);
   const [flip, setFlip] = useState(false);
 
@@ -21,12 +33,14 @@ export default function Cell({ value, isHint, isLast, interactive, onClick }: Ce
   }, [value]);
 
   const hasStone = value !== EMPTY;
+  const isBlack = value === BLACK;
 
   const stateClass = [
     'cell',
     interactive ? 'is-interactive' : '',
     isHint ? 'is-hint' : '',
     isLast ? 'is-last' : '',
+    willFlip ? 'is-will-flip' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -46,14 +60,19 @@ export default function Cell({ value, isHint, isLast, interactive, onClick }: Ce
       className={stateClass}
     >
       {hasStone && (
-        <span
-          onAnimationEnd={() => setFlip(false)}
-          className={`disc ${value === BLACK ? 'disc-black' : 'disc-white'} ${
-            flip ? 'stone-flip' : ''
-          }`}
-        />
+        <span className={`disc-flip-container ${flip ? 'is-flipped' : ''}`}>
+          <span className={`disc disc-face-front ${isBlack ? 'disc-black' : 'disc-white'}`} />
+          <span
+            className={`disc disc-face-back ${isBlack ? 'disc-white' : 'disc-black'}`}
+            aria-hidden="true"
+          />
+        </span>
+      )}
+      {ghost && !hasStone && (
+        <span className={`disc disc-ghost ${ghostColor === 'black' ? 'disc-black' : 'disc-white'}`} />
       )}
       {isHint && !hasStone && <span className="hint-pulse hint-dot" />}
+      {isLast && <span className="last-move-triangle" />}
     </button>
   );
 }

@@ -24,6 +24,7 @@ export default function GameInfo({
   subtitle,
 }: GameInfoProps) {
   const { black, white } = countStones(state.board);
+  const blackRatio = black + white === 0 ? 0.5 : black / (black + white);
   const isMyTurn = myColor !== null && state.currentTurn === myColor;
 
   let statusText = '';
@@ -43,19 +44,19 @@ export default function GameInfo({
     <div className="card w-full p-5">
       <div className="flex items-center justify-between gap-3">
         {subtitle ? (
-          <div className="text-sm font-medium text-neutral-500">{subtitle}</div>
+          <div className="text-sm font-medium text-muted">{subtitle}</div>
         ) : (
           <>
-            <div className="text-sm text-neutral-500">
+            <div className="text-sm text-muted">
               房间号
-              <span className="ml-2 select-all font-mono text-lg font-semibold tracking-widest text-neutral-900">
+              <span className="text-strong ml-2 select-all font-mono text-lg font-semibold tracking-widest">
                 {roomId}
               </span>
             </div>
             <button
               type="button"
               onClick={onCopyCode}
-              className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-700 transition-colors hover:bg-neutral-50 active:scale-95"
+              className="btn-ghost-border flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm active:scale-95"
             >
               <CopyIcon size={16} />
               {copied ? '已复制' : '复制'}
@@ -69,8 +70,15 @@ export default function GameInfo({
         <ScoreDisc kind="white" count={white} active={whiteActive} />
       </div>
 
+      <div className="score-bar-track" aria-hidden="true">
+        <div
+          className="score-bar-fill-black"
+          style={{ width: `${Math.round(blackRatio * 100)}%` }}
+        />
+      </div>
+
       {statusText && (
-        <div className="mt-5 flex items-center justify-center gap-2 text-sm font-medium text-neutral-600">
+        <div className="text-body mt-5 flex items-center justify-center gap-2 text-sm font-medium">
           {state.status === 'playing' && (
             <span
               className={`disc disc-mini ${
@@ -80,7 +88,7 @@ export default function GameInfo({
           )}
           <span>{statusText}</span>
           {isMyTurn && (
-            <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-xs font-normal text-white">
+            <span className="btn-solid rounded-full px-2 py-0.5 text-xs font-normal">
               你
             </span>
           )}
@@ -106,7 +114,7 @@ function ScoreDisc({
       }`}
     >
       <span className={`disc disc-mini ${kind === 'black' ? 'disc-black' : 'disc-white'}`} />
-      <span className="text-2xl font-semibold tabular-nums text-neutral-900">{count}</span>
+      <span className="text-strong text-2xl font-semibold tabular-nums">{count}</span>
     </div>
   );
 }
