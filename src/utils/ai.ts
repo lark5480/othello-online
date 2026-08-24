@@ -182,19 +182,45 @@ function searchDepth(board: Board, difficulty: Difficulty): number {
   return empty <= 10 ? empty : 6;
 }
 
+interface ScoredMove {
+  move: Move;
+  score: number;
+}
+
 /**
- * 对候选步做一次浅层搜索（depth=1）评估，按分数降序排列。
- * 相比纯静态权重排序，能更准确地把强着法排在前面，提升 alpha-beta 剪枝效率。
+ * 对候选步做一次浅层搜索（depth=1）评估，按分数降序返回 { 落子, 浅层分 }。
+ * 相比纯静态权重排序，能更准确地把强着法排在前面，提升 alpha-beta 剪枝效率；
+ * 浅层分可直接作为 2 层搜索的根节点结果复用（见 chooseAIMove 的 medium 分支）。
  */
-function shallowOrderedMoves(board: Board, player: Player): Move[] {
-  const scored: Array<{ move: Move; score: number }> = [];
+function shallowScoredMoves(board: Board, player: Player): ScoredMove[] {
+  const scored: ScoredMove[] = [];
   for (const m of orderedMoves(board, player)) {
     const next = applyMoveBoard(board, m.row, m.col, player);
     const score = minimax(next, player, opponentOf(player), 1, -Infinity, Infinity);
     scored.push({ move: m, score });
   }
   scored.sort((a, b) => b.score - a.score);
-  return scored.map((s) => s.move);
+  return scored;
+}
+
+/** 根节点搜索：按给定顺序逐候选做 depth 层极小极大，返回分数最高的一步 */
+function searchRoot(
+  board: Board,
+  player: Player,
+  candidates: readonly Move[],
+  depth: number
+): Move {
+  let best = candidates[0];
+  let bestScore = -Infinity;
+  for (const m of candidates) {
+    const next = applyMoveBoard(board, m.row, m.col, player);
+    const score = minimax(next, player, opponentOf(player), depth - 1, -Infinity, Infinity);
+    if (score > bestScore) {
+      bestScore = score;
+      best = m;
+    }
+  }
+  return best;
 }
 
 /* ------------------------------------------------------------------ */
@@ -221,39 +247,29 @@ export function chooseAIMove(
     return moves[idx];
   }
 
+  // 候选浅层评分：各难度共用一份（排序结果与后续搜索深度无关）
+  const scored = shallowScoredMoves(board, aiPlayer);
+  const candidates = scored.map((s) => s.move);
+
   if (difficulty === 'medium') {
     const depth = searchDepth(board, difficulty);
-    let best = moves[0];
-    let bestScore = -Infinity;
-    for (const m of shallowOrderedMoves(board, aiPlayer)) {
-      const next = applyMoveBoard(board, m.row, m.col, aiPlayer);
-      const score = minimax(next, aiPlayer, opponentOf(aiPlayer), depth - 1, -Infinity, Infinity);
-      if (score > bestScore) {
-        bestScore = score;
-        best = m;
-      }
+    if (depth === 2) {
+      // 中盘固定 2 层：根搜索(depth-1=1)与浅层评分是同一份计算，直接取最优避免重复搜索
+      return scored[0].move;
     }
-    return best;
+    // 残局(<8 空格)精确到底
+    return searchRoot(board, aiPlayer, candidates, depth);
   }
 
   // 残局精确到底，不走时间预算
   const { empty } = countStones(board);
   if (empty <= 10) {
     const depth = searchDepth(board, difficulty);
-    let best = moves[0];
-    let bestScore = -Infinity;
-    for (const m of shallowOrderedMoves(board, aiPlayer)) {
-      const next = applyMoveBoard(board, m.row, m.col, aiPlayer);
-      const score = minimax(next, aiPlayer, opponentOf(aiPlayer), depth - 1, -Infinity, Infinity);
-      if (score > bestScore) {
-        bestScore = score;
-        best = m;
-      }
-    }
-    return best;
+    return searchRoot(board, aiPlayer, candidates, depth);
   }
 
   // 迭代加深：从深度 2 开始逐层加深，超时返回上一层结果
+  // 候选排序与深度无关，已在循环外算好，各层直接复用
   const budget = TIME_BUDGET[difficulty] ?? 800;
   const maxDepth = MAX_DEPTH[difficulty] ?? 4;
   const start = performance.now();
@@ -262,8 +278,7 @@ export function chooseAIMove(
   for (let depth = 2; depth <= maxDepth; depth++) {
     let currentBest = moves[0];
     let currentBestScore = -Infinity;
-    const ordered = shallowOrderedMoves(board, aiPlayer);
-    for (const m of ordered) {
+    for (const m of candidates) {
       if (performance.now() - start > budget && depth > 2) break;
       const next = applyMoveBoard(board, m.row, m.col, aiPlayer);
       const score = minimax(next, aiPlayer, opponentOf(aiPlayer), depth - 1, -Infinity, Infinity);
