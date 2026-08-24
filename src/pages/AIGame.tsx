@@ -88,17 +88,17 @@ export default function AIGame() {
     if (state.currentTurn !== aiColor) return;
     if (thinkingRef.current) return;
 
+    const worker = workerRef.current;
+    if (!worker) return;
+
     thinkingRef.current = true;
     setThinking(true);
     // 模拟思考节奏，体验更自然；计算本身是同步的，延迟后再执行以避免卡顿观感
     const delay = 450 + Math.random() * 350;
     const currentRequestId = ++requestIdRef.current;
-    const worker = workerRef.current;
-
-    if (!worker) return;
 
     timerRef.current = setTimeout(() => {
-      if (!state || !workerRef.current) return;
+      if (!state || !worker) return;
       const handler = (e: MessageEvent<{ id: number; move: Move | null }>) => {
         if (e.data.id !== currentRequestId || !e.data.move) return;
         const move = e.data.move;

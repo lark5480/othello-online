@@ -75,6 +75,10 @@ export default function Room() {
     } else if (state.status === 'playing') {
       pollEnabled = !myTurn; // 自己回合不轮询
       pollInterval = 2000;
+    } else if (state.status === 'finished') {
+      // 结束后保持低频轮询：对手点「再来一局」后本端自动恢复，无需手动刷新
+      pollEnabled = true;
+      pollInterval = 5000;
     }
   }
 
