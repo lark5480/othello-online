@@ -154,29 +154,29 @@ export default function Room() {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-800"
+            className="flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-body"
           >
             <HomeIcon size={18} />
             返回首页
           </button>
-          <span className="text-sm font-medium tracking-wide text-neutral-400">
+          <span className="text-sm font-medium tracking-wide text-muted">
             黑白棋 · 在线对战
           </span>
         </div>
 
         {notFound ? (
           <div className="card p-10 text-center">
-            <p className="text-neutral-700">房间不存在或已结束</p>
+            <p className="text-body">房间不存在或已结束</p>
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="mt-5 rounded-xl bg-neutral-900 px-6 py-2.5 text-sm font-medium text-white hover:bg-neutral-800"
+              className="btn-solid mt-5 rounded-xl px-6 py-2.5 text-sm font-medium"
             >
               返回首页
             </button>
           </div>
         ) : !state ? (
-          <div className="card p-10 text-center text-neutral-500">加载中…</div>
+          <div className="text-muted card p-10 text-center">加载中…</div>
         ) : (
           <>
             <GameInfo
@@ -189,8 +189,8 @@ export default function Room() {
 
             <div className="card flex items-center justify-between gap-4 p-4">
               <div>
-                <div className="text-sm font-medium text-neutral-800">显示落子提示</div>
-                <div className="mt-0.5 text-xs text-neutral-500">
+                <div className="text-strong text-sm font-medium">显示落子提示</div>
+                <div className="text-muted mt-0.5 text-xs">
                   高亮可落子位置（休闲友好；竞技默认关闭，靠棋力）
                 </div>
               </div>
@@ -201,11 +201,11 @@ export default function Room() {
                 aria-label="显示落子提示"
                 onClick={toggleShowHints}
                 className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${
-                  showHints ? 'bg-neutral-900' : 'bg-neutral-300'
+                  showHints ? 'toggle-on' : 'toggle-off'
                 }`}
               >
                 <span
-                  className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  className={`toggle-knob h-5 w-5 rounded-full shadow transition-transform ${
                     showHints ? 'translate-x-5' : 'translate-x-0.5'
                   }`}
                 />
@@ -217,13 +217,14 @@ export default function Room() {
                 board={state.board}
                 validMoves={validMoves}
                 lastMove={state.lastMove}
-                interactive={!!myTurn}
-                showHints={showHints}
-                onMove={handleMove}
-              />
+            interactive={!!myTurn}
+            showHints={showHints}
+            currentTurn={state.status === 'playing' ? state.currentTurn : null}
+            onMove={handleMove}
+          />
             </div>
 
-            {error && <p className="text-center text-sm text-red-600">{error}</p>}
+            {error && <p className="text-error text-center text-sm">{error}</p>}
 
             {state.status === 'finished' && (
               <EndModal
@@ -261,18 +262,18 @@ function EndModal({ state, myColor, busy, onRestart, onHome, onRefresh }: EndMod
   else title = '你输了';
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 px-4">
+    <div className="overlay-bg fixed inset-0 z-10 flex items-center justify-center px-4">
       <div className="card w-full max-w-xs p-6 text-center">
-        <h2 className="text-xl font-semibold text-neutral-900">{title}</h2>
+        <h2 className="text-strong text-xl font-semibold">{title}</h2>
         <div className="mt-4 flex items-center justify-center gap-6">
           <div className="flex items-center gap-2">
             <span className="disc disc-mini disc-black" />
-            <span className="text-xl font-semibold tabular-nums text-neutral-900">{black}</span>
+            <span className="text-strong text-xl font-semibold tabular-nums">{black}</span>
           </div>
-          <span className="text-neutral-400">:</span>
+          <span className="text-muted">:</span>
           <div className="flex items-center gap-2">
             <span className="disc disc-mini disc-white" />
-            <span className="text-xl font-semibold tabular-nums text-neutral-900">{white}</span>
+            <span className="text-strong text-xl font-semibold tabular-nums">{white}</span>
           </div>
         </div>
         <div className="mt-6 flex flex-col gap-2">
@@ -280,7 +281,7 @@ function EndModal({ state, myColor, busy, onRestart, onHome, onRefresh }: EndMod
             type="button"
             onClick={onRestart}
             disabled={busy}
-            className="flex items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3 text-sm font-medium text-white transition-colors hover:bg-neutral-800 disabled:opacity-60"
+            className="btn-solid flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium disabled:opacity-55"
           >
             <RestartIcon size={18} />
             再来一局
@@ -288,7 +289,7 @@ function EndModal({ state, myColor, busy, onRestart, onHome, onRefresh }: EndMod
           <button
             type="button"
             onClick={onHome}
-            className="rounded-xl border border-neutral-200 py-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+            className="btn-ghost-border rounded-xl py-3 text-sm font-medium"
           >
             返回首页
           </button>
@@ -296,7 +297,7 @@ function EndModal({ state, myColor, busy, onRestart, onHome, onRefresh }: EndMod
         <button
           type="button"
           onClick={onRefresh}
-          className="mt-3 text-xs text-neutral-400 hover:text-neutral-600"
+          className="mt-3 text-xs text-muted"
         >
           刷新状态
         </button>

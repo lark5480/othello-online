@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ThemeToggle from '../components/ThemeToggle';
 import { getPlayerId } from '../utils/player';
 import { ApiError, createRoom, joinRoom } from '../utils/api';
 
 function Logo() {
   return (
     <svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true">
-      <circle cx="22" cy="28" r="15" fill="#111418" />
+      <circle cx="22" cy="28" r="15" fill="var(--text-strong)" />
       <circle cx="34" cy="28" r="15" fill="#ffffff" stroke="#c4ccd6" strokeWidth="1.5" />
     </svg>
   );
@@ -59,19 +60,22 @@ export default function Home() {
   return (
     <main className="page-bg flex min-h-full items-center justify-center px-4 py-10">
       <div className="card w-full max-w-sm p-8">
+        <div className="flex justify-end">
+          <ThemeToggle />
+        </div>
         <div className="flex flex-col items-center text-center">
           <Logo />
-          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-neutral-900">
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-strong">
             Othello Online
           </h1>
-          <p className="mt-1 text-sm text-neutral-500">黑白棋 · 在线对战</p>
+          <p className="mt-1 text-sm text-muted">黑白棋 · 在线对战</p>
         </div>
 
         <button
           type="button"
           onClick={handleCreate}
           disabled={busy}
-          className="mt-8 w-full rounded-xl bg-neutral-900 py-3 text-sm font-medium text-white transition-colors hover:bg-neutral-800 disabled:opacity-60"
+          className="btn-solid mt-8 w-full rounded-xl py-3 text-sm font-medium"
         >
           创建房间
         </button>
@@ -80,15 +84,15 @@ export default function Home() {
           type="button"
           onClick={() => navigate('/ai')}
           disabled={busy}
-          className="mt-3 w-full rounded-xl border border-neutral-900 py-3 text-sm font-medium text-neutral-900 transition-colors hover:bg-neutral-900 hover:text-white disabled:opacity-60"
+          className="btn-outline mt-3 w-full rounded-xl py-3 text-sm font-medium"
         >
           人机对战
         </button>
 
-        <div className="my-5 flex items-center gap-3 text-xs text-neutral-400">
-          <span className="h-px flex-1 bg-neutral-200" />
+        <div className="my-5 flex items-center gap-3 text-xs text-muted">
+          <span className="divider-line h-px flex-1" />
           或输入房间码加入
-          <span className="h-px flex-1 bg-neutral-200" />
+          <span className="divider-line h-px flex-1" />
         </div>
 
         <div className="flex gap-2">
@@ -97,19 +101,19 @@ export default function Home() {
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             maxLength={6}
             placeholder="房间码"
-            className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-center font-mono text-lg tracking-widest uppercase outline-none transition-colors focus:border-neutral-400"
+            className="input-field w-full rounded-xl px-4 py-3 text-center font-mono text-lg tracking-widest uppercase"
           />
           <button
             type="button"
             onClick={handleJoin}
             disabled={busy}
-            className="shrink-0 rounded-xl border border-neutral-900 px-5 py-3 text-sm font-medium text-neutral-900 transition-colors hover:bg-neutral-900 hover:text-white disabled:opacity-60"
+            className="btn-outline shrink-0 rounded-xl px-5 py-3 text-sm font-medium"
           >
             加入
           </button>
         </div>
 
-        {error && <p className="mt-4 text-center text-sm text-red-600">{error}</p>}
+        {error && <p className="text-error mt-4 text-center text-sm">{error}</p>}
       </div>
     </main>
   );

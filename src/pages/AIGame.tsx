@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  applyAIMove,
-  createAIGameState,
-  type Difficulty,
-} from '../utils/ai';
+import { createAIGameState, type Difficulty } from '../utils/ai';
 import { getShowHints, setShowHints } from '../utils/hints';
 import {
   applyMoveToState,
   countStones,
   getValidMoves,
   opponentOf,
+  type Move,
   type GameState,
   type Player,
 } from '../utils/gameLogic';
@@ -22,12 +19,14 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   easy: '简单',
   medium: '中等',
   hard: '困难',
+  master: '大师',
 };
 
 const DIFFICULTY_DESC: Record<Difficulty, string> = {
   easy: '随机落子，适合热身',
   medium: '2 层预判，会抢角',
   hard: '4 层 Minimax + 剪枝，残局精确',
+  master: '6 层迭代加深搜索，残局精确到底',
 };
 
 export default function AIGame() {
@@ -45,6 +44,18 @@ export default function AIGame() {
 
   const thinkingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const requestIdRef = useRef(0);
+
+  // 初始化 / 销毁 Worker
+  useEffect(() => {
+    const worker = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' });
+    workerRef.current = worker;
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+    };
+  }, []);
 
   const myColor: Player = playerColor;
   const aiColor: Player = opponentOf(playerColor);
@@ -81,10 +92,31 @@ export default function AIGame() {
     setThinking(true);
     // 模拟思考节奏，体验更自然；计算本身是同步的，延迟后再执行以避免卡顿观感
     const delay = 450 + Math.random() * 350;
+    const currentRequestId = ++requestIdRef.current;
+    const worker = workerRef.current;
+
+    if (!worker) return;
+
     timerRef.current = setTimeout(() => {
-      setState((prev) => (prev ? applyAIMove(prev, aiColor, difficulty) : prev));
-      thinkingRef.current = false;
-      setThinking(false);
+      if (!state || !workerRef.current) return;
+      const handler = (e: MessageEvent<{ id: number; move: Move | null }>) => {
+        if (e.data.id !== currentRequestId || !e.data.move) return;
+        const move = e.data.move;
+        setState((prev) => {
+          if (!prev || prev.status !== 'playing' || prev.currentTurn !== aiColor) return prev;
+          const res = applyMoveToState(prev, prev.players[aiColor]!, move.row, move.col);
+          return res.ok ? res.state : prev;
+        });
+        thinkingRef.current = false;
+        setThinking(false);
+      };
+      worker.addEventListener('message', handler, { once: true });
+      worker.postMessage({
+        id: currentRequestId,
+        board: state.board,
+        aiPlayer: aiColor,
+        difficulty,
+      });
     }, delay);
 
     return () => {
@@ -111,12 +143,12 @@ export default function AIGame() {
       <main className="page-bg flex min-h-full items-center justify-center px-4 py-10">
         <div className="card w-full max-w-sm p-8">
           <div className="flex flex-col items-center text-center">
-            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">人机对战</h1>
-            <p className="mt-1 text-sm text-neutral-500">选择一个难度，挑战 AI 对手</p>
+            <h1 className="text-strong text-2xl font-semibold tracking-tight">人机对战</h1>
+            <p className="text-muted mt-1 text-sm">选择一个难度，挑战 AI 对手</p>
           </div>
 
           <Section title="难度">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-1.5">
               {(Object.keys(DIFFICULTY_LABELS) as Difficulty[]).map((d) => (
                 <button
                   key={d}
@@ -124,15 +156,15 @@ export default function AIGame() {
                   onClick={() => setDifficulty(d)}
                   className={`rounded-xl border py-2.5 text-sm font-medium transition-colors ${
                     difficulty === d
-                      ? 'border-neutral-900 bg-neutral-900 text-white'
-                      : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                      ? 'btn-solid'
+                      : 'btn-ghost-border'
                   }`}
                 >
                   {DIFFICULTY_LABELS[d]}
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-xs text-neutral-500">{DIFFICULTY_DESC[difficulty]}</p>
+            <p className="text-muted mt-2 text-xs">{DIFFICULTY_DESC[difficulty]}</p>
           </Section>
 
           <Section title="执子">
@@ -142,8 +174,8 @@ export default function AIGame() {
                 onClick={() => setPlayerColor('black')}
                 className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium transition-colors ${
                   playerColor === 'black'
-                    ? 'border-neutral-900 bg-neutral-900 text-white'
-                    : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                    ? 'btn-solid'
+                    : 'btn-ghost-border'
                 }`}
               >
                 <span className="disc disc-mini disc-black" />
@@ -154,8 +186,8 @@ export default function AIGame() {
                 onClick={() => setPlayerColor('white')}
                 className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium transition-colors ${
                   playerColor === 'white'
-                    ? 'border-neutral-900 bg-neutral-900 text-white'
-                    : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                    ? 'btn-solid'
+                    : 'btn-ghost-border'
                 }`}
               >
                 <span className="disc disc-mini disc-white" />
@@ -167,14 +199,14 @@ export default function AIGame() {
           <button
             type="button"
             onClick={startGame}
-            className="mt-8 w-full rounded-xl bg-neutral-900 py-3 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
+            className="btn-solid mt-8 w-full rounded-xl py-3 text-sm font-medium"
           >
             开始对局
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="mt-3 w-full rounded-xl border border-neutral-200 py-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+            className="btn-ghost-border mt-3 w-full rounded-xl py-3 text-sm font-medium"
           >
             返回首页
           </button>
@@ -190,12 +222,12 @@ export default function AIGame() {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-800"
+            className="flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-body"
           >
             <HomeIcon size={18} />
             返回首页
           </button>
-          <span className="text-sm font-medium tracking-wide text-neutral-400">
+          <span className="text-sm font-medium tracking-wide text-muted">
             黑白棋 · 人机对战
           </span>
         </div>
@@ -210,8 +242,8 @@ export default function AIGame() {
 
         <div className="card flex items-center justify-between gap-4 p-4">
           <div>
-            <div className="text-sm font-medium text-neutral-800">显示落子提示</div>
-            <div className="mt-0.5 text-xs text-neutral-500">
+            <div className="text-strong text-sm font-medium">显示落子提示</div>
+            <div className="text-muted mt-0.5 text-xs">
               高亮可落子位置（练习模式默认开启，辅助学习）
             </div>
           </div>
@@ -222,11 +254,11 @@ export default function AIGame() {
             aria-label="显示落子提示"
             onClick={toggleShowHints}
             className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${
-              showHints ? 'bg-neutral-900' : 'bg-neutral-300'
+              showHints ? 'toggle-on' : 'toggle-off'
             }`}
           >
             <span
-              className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
+              className={`toggle-knob h-5 w-5 rounded-full shadow transition-transform ${
                 showHints ? 'translate-x-5' : 'translate-x-0.5'
               }`}
             />
@@ -240,6 +272,7 @@ export default function AIGame() {
             lastMove={state.lastMove}
             interactive={!!myTurn}
             showHints={showHints}
+            currentTurn={state.status === 'playing' ? state.currentTurn : null}
             onMove={handleMove}
           />
         </div>
@@ -248,7 +281,7 @@ export default function AIGame() {
           <button
             type="button"
             onClick={startGame}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
+            className="btn-solid flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium"
           >
             <RestartIcon size={18} />
             新对局
@@ -262,7 +295,7 @@ export default function AIGame() {
               setStarted(false);
               setState(null);
             }}
-            className="flex-1 rounded-xl border border-neutral-200 py-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+            className="btn-ghost-border flex-1 rounded-xl py-3 text-sm font-medium"
           >
             重新设置
           </button>
@@ -291,7 +324,7 @@ interface SectionProps {
 function Section({ title, children }: SectionProps) {
   return (
     <div className="mt-6">
-      <div className="mb-2 text-sm font-medium text-neutral-800">{title}</div>
+      <div className="text-strong mb-2 text-sm font-medium">{title}</div>
       {children}
     </div>
   );
@@ -313,25 +346,25 @@ function EndModal({ state, myColor, onRestart, onHome }: EndModalProps) {
   else title = 'AI 获胜';
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 px-4">
+    <div className="overlay-bg fixed inset-0 z-10 flex items-center justify-center px-4">
       <div className="card w-full max-w-xs p-6 text-center">
-        <h2 className="text-xl font-semibold text-neutral-900">{title}</h2>
+        <h2 className="text-strong text-xl font-semibold">{title}</h2>
         <div className="mt-4 flex items-center justify-center gap-6">
           <div className="flex items-center gap-2">
             <span className="disc disc-mini disc-black" />
-            <span className="text-xl font-semibold tabular-nums text-neutral-900">{black}</span>
+            <span className="text-strong text-xl font-semibold tabular-nums">{black}</span>
           </div>
-          <span className="text-neutral-400">:</span>
+          <span className="text-muted">:</span>
           <div className="flex items-center gap-2">
             <span className="disc disc-mini disc-white" />
-            <span className="text-xl font-semibold tabular-nums text-neutral-900">{white}</span>
+            <span className="text-strong text-xl font-semibold tabular-nums">{white}</span>
           </div>
         </div>
         <div className="mt-6 flex flex-col gap-2">
           <button
             type="button"
             onClick={onRestart}
-            className="flex items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
+            className="btn-solid flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium"
           >
             <RestartIcon size={18} />
             再来一局
@@ -339,7 +372,7 @@ function EndModal({ state, myColor, onRestart, onHome }: EndModalProps) {
           <button
             type="button"
             onClick={onHome}
-            className="rounded-xl border border-neutral-200 py-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+            className="btn-ghost-border rounded-xl py-3 text-sm font-medium"
           >
             返回首页
           </button>

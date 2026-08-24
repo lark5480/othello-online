@@ -6,6 +6,7 @@
 
 ```
 src/utils/ai.ts        # AI 引擎（纯 TS、零依赖，可被前端/测试/Edge Functions 共用）
+src/workers/ai.worker.ts # Web Worker（在独立线程运行 chooseAIMove，避免阻塞主线程）
 src/pages/AIGame.tsx   # 人机对战页（复用 Board / GameInfo / Cell）
 src/components/GameInfo.tsx  # 新增 aiThinking / subtitle 透传，显示「AI 思考中…」
 src/App.tsx            # 新增路由 /ai
@@ -20,7 +21,7 @@ src/pages/Home.tsx     # 新增「人机对战」入口按钮
 ### 类型与常量
 
 ```ts
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'master';
 export const AI_PLAYER_ID = 'ai-opponent';     // 本地对局中 AI 的固定玩家 id
 export const LOCAL_PLAYER_ID = 'local-player';  // 本地对局中玩家的固定玩家 id
 ```
@@ -37,7 +38,9 @@ export const LOCAL_PLAYER_ID = 'local-player';  // 本地对局中玩家的固�
 | `rng` | 仅 `easy` 使用，可注入以固定随机（默认 `Math.random`），便于测试 |
 
 - 返回 `Move {row, col}`；当 AI 当前无合法落子时返回 `null`（正常对局中不会在对 AI 回合调用到此）。
-- 纯函数、无副作用；相同输入恒得相同落子（确定性，便于单测）。
+- `medium` 纯函数、无副作用，相同输入恒得相同落子。
+- `hard` / `master` 使用迭代加深 + 时间预算（hard 800ms / master 1500ms），残局（≤10 空格）精确到底。搜索结果确定性（相同输入相同落子），但耗时受硬件影响。
+- 候选步先做 depth=1 浅层搜索排序（`shallowOrderedMoves`），提升 alpha-beta 剪枝效率。
 
 ### `createAIGameState(playerColor, difficulty)` → `GameState`
 
@@ -63,10 +66,11 @@ export const LOCAL_PLAYER_ID = 'local-player';  // 本地对局中玩家的固�
 | 难度 | 策略 | 搜索深度 | 强度 |
 | --- | --- | --- | --- |
 | `easy` | 合法点中等概率随机 | — | 热身用，可被任意策略战胜 |
-| `medium` | Minimax + alpha-beta | 中盘 2 层；残局(≤8 空格)精确到底 | 会抢角、避免 `X/C` 位 |
-| `hard` | Minimax + alpha-beta + **落子顺序剪枝**（角优先） | 中盘 4 层；残局(≤10 空格)精确解 | 强；单步 < 2s（已测） |
+| `medium` | Minimax + alpha-beta + 浅层排序 | 中盘 2 层；残局(≤8 空格)精确到底 | 会抢角、避免 `X/C` 位 |
+| `hard` | 迭代加深 + 浅层排序 + 时间预算 800ms | 中盘最大 4 层；残局(≤10 空格)精确解 | 强；单步 < 2s |
+| `master` | 迭代加深 + 浅层排序 + 时间预算 1500ms | 中盘最大 6 层；残局(≤10 空格)精确解 | 很强；明显强于 hard |
 
-> **落子顺序（move ordering）**：遍历合法点时按位置权重降序（角优先），使 alpha-beta 更早命中剪枝点，将整文件测试从 140s 降至 ~8s，且**不改变搜索结果**。
+> **移动排序**：遍历合法点时按位置权重降序（角优先）做静态排序，再对每个候选步做 depth=1 浅层搜索评估并按分数重排——使 alpha-beta 更早命中剪枝点。
 
 ## 4. 前端交互流程
 
@@ -74,7 +78,7 @@ export const LOCAL_PLAYER_ID = 'local-player';  // 本地对局中玩家的固�
 2. 设置阶段：选难度（简单/中等/困难）+ 执子（黑先手 / 白后手）→ 开始对局。
 3. 对局阶段：
    - 玩家回合：`Board` 可点击，落子后 `applyMoveToState` 切换回合。
-   - AI 回合：`useEffect` 侦测到 `currentTurn === aiColor` → 显示「AI 思考中…」→ 延迟 450–800ms（自然节奏）→ `applyAIMove` 落子。
+   - AI 回合：`useEffect` 侦测到 `currentTurn === aiColor` → 显示「AI 思考中…」→ 延迟 450–800ms 后通过 **Web Worker**（`src/workers/ai.worker.ts`）异步调用 `chooseAIMove`，计算完成后 `applyMoveToState` 更新状态。主线程不阻塞，ghost 预览和动画全程流畅。
    - 自动处理「对方无子可下 → 跳过」与连续跳过；双方均无子可下则 `finished` 弹窗（你赢 / AI 获胜 / 平局）。
 4. 落子提示开关：AI 模式默认开启（`getShowHints('ai')`），可在对局页随时切换，按设备持久化（`localStorage`）。关闭提示后棋盘仍可正常落子（与 `Board` 的 `interactive` / `isHint` 解耦一致）。
 
@@ -84,10 +88,10 @@ export const LOCAL_PLAYER_ID = 'local-player';  // 本地对局中玩家的固�
 npm install
 npm run dev        # 浏览器开 /ai 即与 AI 对弈，无需后端
 npm run typecheck  # tsc --noEmit，应无错误
-npm test           # vitest，AI 引擎 15 用例 + 既有 21 用例，共 36 全绿
+npm test           # vitest，AI 引擎 18 用例 + 既有 20 用例，共 38 全绿
 ```
 
-测试覆盖（`src/utils/ai.test.ts`）：评估函数性质、各难度合法落子、easy 的 rng 可控性、medium/hard 确定性、本地状态编排（先手/跳过/不抢手）、自对弈回合与终局不变量（棋子守恒、胜负一致）、**hard 首步与中盘单步均 < 2s**、hard 稳定战胜 easy。
+测试覆盖（`src/utils/ai.test.ts`）：评估函数性质、各难度合法落子、easy 的 rng 可控性、medium/hard 确定性、本地状态编排（先手/跳过/不抢手）、自对弈回合与终局不变量（棋子守恒、胜负一致）、hard 首步与中盘单步均 < 2s、master 在时间预算内完成且返回合法落子、easy 不受迭代加深影响、hard/master 残局精确求解、hard 稳定战胜 easy。
 
 ## 6. 集成清单（已落地）
 
@@ -96,6 +100,7 @@ npm test           # vitest，AI 引擎 15 用例 + 既有 21 用例，共 36 �
 - [x] `src/App.tsx` —— `/ai` 路由
 - [x] `src/pages/Home.tsx` —— 「人机对战」入口
 - [x] `src/components/GameInfo.tsx` —— `aiThinking` / `subtitle` 透传
+- [x] `src/workers/ai.worker.ts` —— Web Worker 封装 `chooseAIMove`
 - [x] `src/utils/ai.test.ts` —— 完整单元测试（确定性 + 性能回归）
 - [x] `npm run typecheck` 与 `npm test` 全绿
 

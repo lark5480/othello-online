@@ -34,7 +34,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-const DIFFS: Difficulty[] = ['easy', 'medium', 'hard'];
+const DIFFS: Difficulty[] = ['easy', 'medium', 'hard', 'master'];
 
 describe('评估函数 evaluate', () => {
   it('角位权重为正且远高于内部', () => {
@@ -189,6 +189,36 @@ describe('难度分级强度差异', () => {
       else if (w === 'white') easyWins++;
     }
     expect(hardWins).toBeGreaterThan(easyWins);
+  });
+});
+
+describe('master 难度', () => {
+  it('初始局面返回合法落子且在时间预算内完成', () => {
+    const board = createInitialBoard();
+    const t0 = Date.now();
+    const m = chooseAIMove(board, 'black', 'master');
+    const dt = Date.now() - t0;
+    expect(m).not.toBeNull();
+    expect(getValidMoves(board, 'black')).toContainEqual(m);
+    expect(dt).toBeLessThan(3000);
+  });
+
+  it('easy 不受迭代加深影响（rng 仍决定结果）', () => {
+    const board = createInitialBoard();
+    const moves = getValidMoves(board, 'black');
+    expect(chooseAIMove(board, 'black', 'easy', () => 0)).toEqual(moves[0]);
+    expect(chooseAIMove(board, 'black', 'easy', () => 0.999)).toEqual(moves[moves.length - 1]);
+  });
+
+  it('残局 ≤10 空格精确求解（唯一合法落子为角）', () => {
+    // 构造一个空格极少、唯一合法落子为 (7,7) 的局面：
+    // 全盘填白，仅第 8 行中间放连续黑子，白方在 (7,7) 落子可翻转整段黑子。
+    const board: Board = Array.from({ length: 8 }, () => Array(8).fill(WHITE));
+    for (let c = 1; c <= 6; c++) board[7][c] = BLACK;
+    board[7][7] = EMPTY;
+    for (const d of ['hard', 'master'] as Difficulty[]) {
+      expect(chooseAIMove(board, 'white', d)).toEqual({ row: 7, col: 7 });
+    }
   });
 });
 

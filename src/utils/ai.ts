@@ -24,7 +24,7 @@ import {
   type Player,
 } from './gameLogic';
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'master';
 
 export const AI_PLAYER_ID = 'ai-opponent';
 export const LOCAL_PLAYER_ID = 'local-player';
@@ -47,6 +47,18 @@ const POSITION_WEIGHTS: ReadonlyArray<ReadonlyArray<number>> = [
 
 /** 残局/终局的绝对胜负分值（远大于任何位置权重，确保搜索优先取胜） */
 const TERMINAL_WIN = 1_000_000;
+
+/** 各难度的迭代加深时间预算（毫秒） */
+const TIME_BUDGET: Record<string, number> = {
+  hard: 800,
+  master: 1500,
+};
+
+/** 各难度在中盘的最大搜索深度 */
+const MAX_DEPTH: Record<string, number> = {
+  hard: 4,
+  master: 6,
+};
 
 /**
  * 落子顺序：按位置权重降序（角优先、X/C 位靠后）。
@@ -165,8 +177,24 @@ function searchDepth(board: Board, difficulty: Difficulty): number {
     // 中盘浅搜(2 层)，残局(<8 空格)精确到底
     return empty <= 8 ? empty : 2;
   }
-  // hard：常规 4 层(配合落子顺序剪枝足够强)；残局(<10 空格)退化为精确解，确保最优且不超时
-  return empty <= 10 ? empty : 4;
+  if (difficulty === 'hard') return empty <= 10 ? empty : 4;
+  // master：常规 6 层；残局(<10 空格)精确到底
+  return empty <= 10 ? empty : 6;
+}
+
+/**
+ * 对候选步做一次浅层搜索（depth=1）评估，按分数降序排列。
+ * 相比纯静态权重排序，能更准确地把强着法排在前面，提升 alpha-beta 剪枝效率。
+ */
+function shallowOrderedMoves(board: Board, player: Player): Move[] {
+  const scored: Array<{ move: Move; score: number }> = [];
+  for (const m of orderedMoves(board, player)) {
+    const next = applyMoveBoard(board, m.row, m.col, player);
+    const score = minimax(next, player, opponentOf(player), 1, -Infinity, Infinity);
+    scored.push({ move: m, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((s) => s.move);
 }
 
 /* ------------------------------------------------------------------ */
@@ -176,7 +204,7 @@ function searchDepth(board: Board, difficulty: Difficulty): number {
 /**
  * 选择 AI 的落子点。
  * - easy：在合法点中等概率随机（rng 可注入，便于测试确定性）。
- * - medium/hard：Minimax(+alpha-beta) 选定评估最优的一步。
+ * - medium/hard/master：Minimax(+alpha-beta) 选定评估最优的一步。
  * 无合法落子(不应在对 AI 回合调用)时返回 null。
  */
 export function chooseAIMove(
@@ -193,16 +221,59 @@ export function chooseAIMove(
     return moves[idx];
   }
 
-  const depth = searchDepth(board, difficulty);
-  let best = moves[0];
-  let bestScore = -Infinity;
-  for (const m of orderedMoves(board, aiPlayer)) {
-    const next = applyMoveBoard(board, m.row, m.col, aiPlayer);
-    const score = minimax(next, aiPlayer, opponentOf(aiPlayer), depth - 1, -Infinity, Infinity);
-    if (score > bestScore) {
-      bestScore = score;
-      best = m;
+  if (difficulty === 'medium') {
+    const depth = searchDepth(board, difficulty);
+    let best = moves[0];
+    let bestScore = -Infinity;
+    for (const m of shallowOrderedMoves(board, aiPlayer)) {
+      const next = applyMoveBoard(board, m.row, m.col, aiPlayer);
+      const score = minimax(next, aiPlayer, opponentOf(aiPlayer), depth - 1, -Infinity, Infinity);
+      if (score > bestScore) {
+        bestScore = score;
+        best = m;
+      }
     }
+    return best;
+  }
+
+  // 残局精确到底，不走时间预算
+  const { empty } = countStones(board);
+  if (empty <= 10) {
+    const depth = searchDepth(board, difficulty);
+    let best = moves[0];
+    let bestScore = -Infinity;
+    for (const m of shallowOrderedMoves(board, aiPlayer)) {
+      const next = applyMoveBoard(board, m.row, m.col, aiPlayer);
+      const score = minimax(next, aiPlayer, opponentOf(aiPlayer), depth - 1, -Infinity, Infinity);
+      if (score > bestScore) {
+        bestScore = score;
+        best = m;
+      }
+    }
+    return best;
+  }
+
+  // 迭代加深：从深度 2 开始逐层加深，超时返回上一层结果
+  const budget = TIME_BUDGET[difficulty] ?? 800;
+  const maxDepth = MAX_DEPTH[difficulty] ?? 4;
+  const start = performance.now();
+  let best = moves[0];
+
+  for (let depth = 2; depth <= maxDepth; depth++) {
+    let currentBest = moves[0];
+    let currentBestScore = -Infinity;
+    const ordered = shallowOrderedMoves(board, aiPlayer);
+    for (const m of ordered) {
+      if (performance.now() - start > budget && depth > 2) break;
+      const next = applyMoveBoard(board, m.row, m.col, aiPlayer);
+      const score = minimax(next, aiPlayer, opponentOf(aiPlayer), depth - 1, -Infinity, Infinity);
+      if (score > currentBestScore) {
+        currentBestScore = score;
+        currentBest = m;
+      }
+    }
+    best = currentBest;
+    if (performance.now() - start >= budget) break;
   }
   return best;
 }
