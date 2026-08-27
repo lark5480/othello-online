@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getPlayerId } from '../utils/player';
 import { getShowHints, setShowHints } from '../utils/hints';
-import { ApiError, getRoomState, postMove, restartRoom } from '../utils/api';
+import { ApiError, getRoomState, isStorageError, postMove, restartRoom, STORAGE_HINT } from '../utils/api';
 import { countStones, getValidMoves, type GameState, type Player } from '../utils/gameLogic';
 import { usePolling } from '../hooks/usePolling';
 import Board from '../components/Board';
@@ -49,6 +49,7 @@ export default function Room() {
       .catch((e) => {
         if (cancelled) return;
         if (e instanceof ApiError && e.status === 404) setNotFound(true);
+        else if (isStorageError(e)) setError(STORAGE_HINT);
         else setError('加载失败');
       });
     return () => {
@@ -95,6 +96,7 @@ export default function Room() {
   useEffect(() => {
     if (!pollError) return;
     if (pollError instanceof ApiError && pollError.status === 404) setNotFound(true);
+    else if (isStorageError(pollError)) setError(STORAGE_HINT);
     else setError('与服务器同步失败');
   }, [pollError]);
 
@@ -108,7 +110,7 @@ export default function Room() {
     setBusy(true);
     setError(null);
     try {
-      const { state: ns } = await postMove(roomId, playerId, row, col);
+      const { state: ns } = await postMove(roomId, playerId, row, col, state.updatedAt);
       applyState(ns);
     } catch (e) {
       if (e instanceof ApiError && (e.status === 409 || e.status === 400)) {

@@ -104,13 +104,16 @@ export function createMockApi() {
 
     if (method === 'POST' && action === 'move') {
       const body = await readBody(req);
-      const { playerId, row, col } = body;
+      const { playerId, row, col, expectedUpdatedAt } = body;
       if (
         typeof playerId !== 'string' ||
         typeof row !== 'number' ||
         typeof col !== 'number'
       ) {
         return sendJson(res, 400, { error: 'playerId, row, col required' });
+      }
+      if (typeof expectedUpdatedAt === 'number' && state.updatedAt !== expectedUpdatedAt) {
+        return sendJson(res, 409, { error: 'state conflict' });
       }
       const result = applyMoveToState(state, playerId, row, col);
       if (!result.ok) return sendJson(res, result.status, { error: result.error });
@@ -124,11 +127,10 @@ export function createMockApi() {
       if (state.status !== 'finished') {
         return sendJson(res, 409, { error: 'game not finished' });
       }
-      if (
-        typeof playerId === 'string' &&
-        state.players.black !== playerId &&
-        state.players.white !== playerId
-      ) {
+      if (typeof playerId !== 'string' || !playerId) {
+        return sendJson(res, 400, { error: 'playerId required' });
+      }
+      if (state.players.black !== playerId && state.players.white !== playerId) {
         return sendJson(res, 403, { error: 'not a player' });
       }
       const updated = restartState(state);

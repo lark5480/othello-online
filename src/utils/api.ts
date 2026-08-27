@@ -11,6 +11,17 @@ export class ApiError extends Error {
   }
 }
 
+/** 与 edge-functions/lib/kv.ts 的 STORAGE_ERROR 保持一致：后端存储未配置 */
+const STORAGE_ERROR = 'storage not configured';
+
+/** 存储未配置时给用户的友好提示（可直接玩人机对战 / 本地双人开玩） */
+export const STORAGE_HINT =
+  '在线对战后端存储(KV)尚未配置,暂时无法联机对战。可直接玩「人机对战」,或本地 npm run dev 双人开玩。';
+
+export function isStorageError(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 503 || e.message === STORAGE_ERROR);
+}
+
 async function parse<T>(res: Response): Promise<T> {
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) {
@@ -53,12 +64,13 @@ export async function postMove(
   roomId: string,
   playerId: string,
   row: number,
-  col: number
+  col: number,
+  expectedUpdatedAt?: number
 ): Promise<{ state: GameState }> {
   const res = await fetch(`${BASE}/room/${roomId}/move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId, row, col }),
+    body: JSON.stringify({ playerId, row, col, expectedUpdatedAt }),
   });
   return parse(res);
 }

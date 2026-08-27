@@ -95,10 +95,69 @@ describe('Edge Functions 全流程（内存 KV 模拟）', () => {
     expect(r.status).toBe(409);
   });
 
-  it('KV 未绑定时返回 500', async () => {
+  it('KV 未绑定时返回 503 storage not configured', async () => {
     // 用空 env 模拟未配置 KV
     const badCtx = ctx({ playerId: 'a' }, {}, undefined as unknown as KVNamespace);
     const res = await parse(await createRoom(badCtx));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe('storage not configured');
+  });
+
+  it('move 携带过期 expectedUpdatedAt 返回 409（乐观并发）', async () => {
+    const kv = new MemKV();
+    const c = await parse(await createRoom(ctx({ playerId: 'a' }, {}, kv)));
+    const roomId = c.body.roomId as string;
+    await joinRoom(ctx({ roomId, playerId: 'b' }, { roomId }, kv));
+    const st = (await parse(await getState(ctx({}, { roomId }, kv)))).body.state as GameState;
+    const moves = getValidMoves(st.board, 'black');
+    const pick = moves[0];
+
+    // 过期（比真实值小）的 expectedUpdatedAt → 冲突拒绝
+    const wrong = await parse(
+      await move(
+        ctx(
+          { playerId: 'a', row: pick.row, col: pick.col, expectedUpdatedAt: st.updatedAt - 1 },
+          { roomId },
+          kv
+        )
+      )
+    );
+    expect(wrong.status).toBe(409);
+
+    // 正确的 expectedUpdatedAt → 正常落子
+    const ok = await parse(
+      await move(
+        ctx(
+          { playerId: 'a', row: pick.row, col: pick.col, expectedUpdatedAt: st.updatedAt },
+          { roomId },
+          kv
+        )
+      )
+    );
+    expect(ok.status).toBe(200);
+  });
+
+  it('restart 缺 playerId 返回 400，非房间玩家返回 403', async () => {
+    const kv = new MemKV();
+    const c = await parse(await createRoom(ctx({ playerId: 'a' }, {}, kv)));
+    const roomId = c.body.roomId as string;
+    await joinRoom(ctx({ roomId, playerId: 'b' }, { roomId }, kv));
+
+    let st: GameState = (await parse(await getState(ctx({}, { roomId }, kv)))).body.state;
+    let guard = 0;
+    while (st.status === 'playing' && guard < 100) {
+      guard++;
+      const moves = getValidMoves(st.board, st.currentTurn);
+      const pick = moves[0];
+      const pid = st.currentTurn === 'black' ? 'a' : 'b';
+      st = (await parse(await move(ctx({ playerId: pid, row: pick.row, col: pick.col }, { roomId }, kv)))).body.state;
+    }
+    expect(st.status).toBe('finished');
+
+    const noId = await parse(await restart(ctx({}, { roomId }, kv)));
+    expect(noId.status).toBe(400);
+
+    const notPlayer = await parse(await restart(ctx({ playerId: 'z' }, { roomId }, kv)));
+    expect(notPlayer.status).toBe(403);
   });
 });

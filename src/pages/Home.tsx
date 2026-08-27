@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import { getPlayerId } from '../utils/player';
-import { ApiError, createRoom, joinRoom } from '../utils/api';
+import { ApiError, createRoom, isStorageError, joinRoom, STORAGE_HINT } from '../utils/api';
 
 function Logo() {
   return (
@@ -25,8 +25,8 @@ export default function Home() {
     try {
       const { roomId } = await createRoom(getPlayerId());
       navigate(`/room/${roomId}`);
-    } catch {
-      setError('创建房间失败，请稍后重试');
+    } catch (e) {
+      setError(isStorageError(e) ? STORAGE_HINT : '创建房间失败,请稍后重试');
     } finally {
       setBusy(false);
     }
@@ -46,11 +46,13 @@ export default function Home() {
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : '';
       setError(
-        msg === 'room not found'
-          ? '房间不存在'
-          : msg === 'room full'
-            ? '房间已满'
-            : '加入失败，请稍后重试'
+        isStorageError(e)
+          ? STORAGE_HINT
+          : msg === 'room not found'
+            ? '房间不存在'
+            : msg === 'room full'
+              ? '房间已满'
+              : '加入失败,请稍后重试'
       );
     } finally {
       setBusy(false);
