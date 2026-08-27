@@ -1,11 +1,11 @@
 import type { EdgeContext } from '../../../types';
 import { error, json } from '../../../lib/http';
-import { getKV, getState, putState } from '../../../lib/kv';
+import { getKV, getState, putState, STORAGE_ERROR } from '../../../lib/kv';
 import { restartState } from '../../../../src/utils/gameLogic';
 
 export async function onRequestPost(context: EdgeContext) {
   const kv = getKV(context);
-  if (!kv) return error('KV not configured', 500);
+  if (!kv) return error(STORAGE_ERROR, 503);
 
   const roomId = context.params.roomId;
 
@@ -24,13 +24,12 @@ export async function onRequestPost(context: EdgeContext) {
     return error('game not finished', 409);
   }
 
-  // 仅房间内玩家可发起
+  // 仅房间内玩家可发起；缺 playerId 直接拒绝，避免被任意请求重置对局
   const playerId = body?.playerId;
-  if (
-    playerId &&
-    state.players.black !== playerId &&
-    state.players.white !== playerId
-  ) {
+  if (typeof playerId !== 'string' || !playerId) {
+    return error('playerId required', 400);
+  }
+  if (state.players.black !== playerId && state.players.white !== playerId) {
     return error('not a player', 403);
   }
 

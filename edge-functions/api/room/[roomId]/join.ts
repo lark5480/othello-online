@@ -1,11 +1,11 @@
 import type { EdgeContext } from '../../../types';
 import { error, json } from '../../../lib/http';
-import { getKV, getState, putState } from '../../../lib/kv';
+import { getKV, getState, putState, STORAGE_ERROR } from '../../../lib/kv';
 import { joinState } from '../../../../src/utils/gameLogic';
 
 export async function onRequestPost(context: EdgeContext) {
   const kv = getKV(context);
-  if (!kv) return error('KV not configured', 500);
+  if (!kv) return error(STORAGE_ERROR, 503);
 
   const roomId = context.params.roomId;
 

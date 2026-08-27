@@ -1,6 +1,6 @@
 import type { EdgeContext } from '../../types';
 import { error, json } from '../../lib/http';
-import { getKV, putState } from '../../lib/kv';
+import { getKV, putState, STORAGE_ERROR } from '../../lib/kv';
 import { createInitialState } from '../../../src/utils/gameLogic';
 
 // 排除易混字符 0/O/1/I 的 6 位房间码字符集
@@ -29,7 +29,7 @@ async function generateRoomId(
 
 export async function onRequestPost(context: EdgeContext) {
   const kv = getKV(context);
-  if (!kv) return error('KV not configured', 500);
+  if (!kv) return error(STORAGE_ERROR, 503);
 
   let body: { playerId?: string };
   try {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { createMockApi } from './mockApi';
+import { getValidMoves, type GameState } from '../src/utils/gameLogic';
 
 function makeReq(url: string, method: string, body?: unknown) {
   const ee = new EventEmitter();
@@ -86,5 +87,54 @@ describe('本地 mock API（dev/preview 中间件）', () => {
     await call(handler, `/api/room/${roomId}/join`, 'POST', { playerId: 'B' });
     const full = await call(handler, `/api/room/${roomId}/join`, 'POST', { playerId: 'C' });
     expect(full.status).toBe(409);
+  });
+
+  it('move 携带过期 expectedUpdatedAt 返回 409（乐观并发）', async () => {
+    const handler = createMockApi();
+    const c = await call(handler, '/api/room/create', 'POST', { playerId: 'A' });
+    const roomId = c.json.roomId as string;
+    await call(handler, `/api/room/${roomId}/join`, 'POST', { playerId: 'B' });
+    const s = await call(handler, `/api/room/${roomId}/state`, 'GET');
+    const st = s.json.state as GameState;
+
+    const wrong = await call(handler, `/api/room/${roomId}/move`, 'POST', {
+      playerId: 'A',
+      row: 2,
+      col: 3,
+      expectedUpdatedAt: st.updatedAt - 1,
+    });
+    expect(wrong.status).toBe(409);
+
+    const ok = await call(handler, `/api/room/${roomId}/move`, 'POST', {
+      playerId: 'A',
+      row: 2,
+      col: 3,
+      expectedUpdatedAt: st.updatedAt,
+    });
+    expect(ok.status).toBe(200);
+  });
+
+  it('restart 缺 playerId 返回 400，非房间玩家返回 403', async () => {
+    const handler = createMockApi();
+    const c = await call(handler, '/api/room/create', 'POST', { playerId: 'A' });
+    const roomId = c.json.roomId as string;
+    await call(handler, `/api/room/${roomId}/join`, 'POST', { playerId: 'B' });
+
+    let st = (await call(handler, `/api/room/${roomId}/state`, 'GET')).json.state as GameState;
+    let guard = 0;
+    while (st.status === 'playing' && guard < 100) {
+      guard++;
+      const moves = getValidMoves(st.board, st.currentTurn);
+      const pick = moves[0];
+      const pid = st.currentTurn === 'black' ? 'A' : 'B';
+      st = (await call(handler, `/api/room/${roomId}/move`, 'POST', { playerId: pid, row: pick.row, col: pick.col })).json.state;
+    }
+    expect(st.status).toBe('finished');
+
+    const noId = await call(handler, `/api/room/${roomId}/restart`, 'POST', {});
+    expect(noId.status).toBe(400);
+
+    const notPlayer = await call(handler, `/api/room/${roomId}/restart`, 'POST', { playerId: 'Z' });
+    expect(notPlayer.status).toBe(403);
   });
 });
