@@ -26,7 +26,15 @@ export default function Cell({
   const [flip, setFlip] = useState(false);
 
   useEffect(() => {
-    if (prev.current !== value && value !== EMPTY) {
+    // 仅「棋子被翻转」（旧色 → 新色）时播放翻转动画；
+    // 新落子（空 → 有子）直接以正确颜色出现，不做翻转
+    if (
+      prev.current !== EMPTY &&
+      prev.current !== value &&
+      value !== EMPTY &&
+      // 系统开启「减少动态效果」时动画被禁用，跳过翻转态，直接显示正确颜色
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
       setFlip(true);
     }
     prev.current = value;
@@ -34,6 +42,11 @@ export default function Cell({
 
   const hasStone = value !== EMPTY;
   const isBlack = value === BLACK;
+
+  // 翻转动画期间：正面 = 翻转前旧色、背面 = 当前新色，0°→180° 恰好呈现旧色翻成新色；
+  // 静态（未翻转）时：正面 = 当前颜色，保证任何时候最终显示都正确
+  const currentFace = isBlack ? 'disc-black' : 'disc-white';
+  const otherFace = isBlack ? 'disc-white' : 'disc-black';
 
   const stateClass = [
     'cell',
@@ -60,10 +73,18 @@ export default function Cell({
       className={stateClass}
     >
       {hasStone && (
-        <span className={`disc-flip-container ${flip ? 'is-flipped' : ''}`}>
-          <span className={`disc disc-face-front ${isBlack ? 'disc-black' : 'disc-white'}`} />
+        <span
+          className={`disc-flip-container ${flip ? 'is-flipped' : ''}`}
+          onAnimationEnd={(e) => {
+            // 仅翻转动画结束时复位；过滤子元素冒泡的其他动画事件
+            if (e.animationName === 'disc-flip-anim') setFlip(false);
+          }}
+        >
           <span
-            className={`disc disc-face-back ${isBlack ? 'disc-white' : 'disc-black'}`}
+            className={`disc disc-face-front ${flip ? otherFace : currentFace}`}
+          />
+          <span
+            className={`disc disc-face-back ${flip ? currentFace : otherFace}`}
             aria-hidden="true"
           />
         </span>
