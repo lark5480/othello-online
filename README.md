@@ -29,6 +29,8 @@
 
 ## 快速开始（本地）
 
+需要 **Node.js ≥ 22.22.2**（推荐 24 LTS；本项目测试依赖 jsdom 30 / undici 8，均要求新版本 Node）。
+
 ```bash
 npm install
 npm run dev

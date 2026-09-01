@@ -14,7 +14,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # jsdom 30 / undici 8 要求 Node ^22.22.2 || ^24.15.0 || >=26，本地与 CI 保持一致
+          node-version: 24
           cache: npm
 
       - run: npm ci
