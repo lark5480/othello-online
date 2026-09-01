@@ -1,15 +1,18 @@
 import type { EdgeContext } from '../../../types';
 import { error, json } from '../../../lib/http';
 import { getKV, getState, putState, STORAGE_ERROR } from '../../../lib/kv';
-import { restartState } from '../../../../src/utils/gameLogic';
+import { restartState, toPublicState } from '../../../../src/utils/gameLogic';
+import { normalizeRoomId } from '../../../../src/utils/roomCode';
 
 export async function onRequestPost(context: EdgeContext) {
   const kv = getKV(context);
   if (!kv) return error(STORAGE_ERROR, 503);
 
-  const roomId = context.params.roomId;
+  const rawRoomId = String(context.params.roomId ?? '');
+  const roomId = normalizeRoomId(rawRoomId);
+  if (!roomId) return error('invalid roomId', 400);
 
-  let body: { playerId?: string };
+  let body: { playerId?: unknown };
   try {
     body = await context.request.json();
   } catch {
@@ -35,5 +38,5 @@ export async function onRequestPost(context: EdgeContext) {
 
   const updated = restartState(state);
   await putState(kv, updated);
-  return json({ state: updated });
+  return json({ state: toPublicState(updated) });
 }

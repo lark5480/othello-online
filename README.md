@@ -9,9 +9,13 @@
 - 合法落子自动翻转，带翻转动画。
 - 无合法落子时自动跳过并提示对方；双方均不可落子或棋盘满时判定胜负。
 - **落子提示可配置开关**：联网对战默认关闭（靠棋力，保公平），休闲对局可在对局页手动开启；提示状态按设备保存在 localStorage。
-- **人机对战（P2）**：单机离线即可挑战 AI，三档难度——简单（随机）、中等（2 层预判）、困难（4 层 Minimax + 剪枝、残局精确）。无需后端 / KV。
+- **人机对战（P2）**：单机离线即可挑战 AI，四档难度——简单（随机）、中等（2 层预判）、困难（4 层 Minimax + 剪枝）、大师（迭代加深 + 残局精确），AI 计算在 Web Worker 中进行不卡界面，并按难度记录本地战绩。无需后端 / KV。
+- 程序化音效（Web Audio 合成，零音频文件）+ 静音开关。
+- 走子历史侧栏（联机与人机模式均展示）。
+- 暗色模式（跟随系统 `prefers-color-scheme`）。
 - 最后落子位置高亮（青色描边），方便追踪局势。
 - 响应式布局，支持键盘聚焦与屏幕阅读器（`aria-label`）。
+- 测试覆盖：Vitest 单元/组件测试 + Playwright 双窗口 E2E，GitHub Actions CI 自动执行。
 
 ## 技术栈
 
@@ -20,7 +24,7 @@
 | 前端 | React 18、Vite 6、TypeScript、Tailwind CSS v4 |
 | 后端 | EdgeOne Makers Edge Functions（V8）、KV 存储 |
 | 同步 | 前端轮询（`usePolling`）+ `currentTurn`/`updatedAt` 防并发与陈旧数据 |
-| 测试 | Vitest |
+| 测试 | Vitest（单元/组件）+ Playwright（双窗口 E2E），GitHub Actions CI |
 | 部署 | EdgeOne Makers（GitHub 自动部署 / `edgeone pages deploy`） |
 
 ## 快速开始（本地）
@@ -53,21 +57,30 @@ npm run preview   # 本地预览构建产物
 ## 项目结构
 
 ```
-src/                  前端源码（pages / components / hooks / utils / index.css）
-                      pages: Home（首页）、Room（联机对局）、AIGame（人机对战）
-                      utils: gameLogic.ts（规则引擎）、ai.ts（AI 对手引擎）、hints.ts（提示开关）
-edge-functions/       服务端 Edge Functions（create / join / state / move / restart）
-server/mockApi.ts     本地免 EdgeOne 验证用的 Vite 中间件
-scripts/              类型剥离自测脚本
-docs/                 需求PRD、部署指南
-edgeone.json          SPA fallback 配置
+src/                   前端源码
+├─ pages/              Home（首页）、Room（联机对局）、AIGame（人机对战，路由 /ai）
+├─ components/         Board / Cell / GameInfo / MoveHistory / StatsPanel / ThemeToggle / icons
+├─ hooks/              usePolling（状态轮询）、useBoardSound（音效）
+├─ workers/            ai.worker.ts（AI 异步计算，不阻塞主线程）
+├─ utils/              gameLogic.ts（规则引擎）、ai.ts（AI 引擎）、hints.ts（提示开关）、
+│                      api.ts / player.ts / roomCode.ts / sound.ts / stats.ts / theme.ts
+├─ test/               setup.ts（Vitest：jsdom + jest-dom）
+└─ index.css           设计令牌 + 棋盘/棋子/提示样式
+edge-functions/        Edge Functions：create / join / [roomId]/{state, move, restart} + lib（router/kv/types）
+server/mockApi.ts      本地免 EdgeOne 验证的 Vite 中间件（内存 KV，端点与生产一致）
+e2e/                   Playwright 双窗口冒烟测试（room.spec.ts）
+scripts/               类型剥离自测脚本
+.github/workflows/     CI（typecheck + 单测 + E2E）
+docs/                  需求PRD、部署指南、AI 模式、竞品分析
+edgeone.json           SPA fallback 配置
 ```
 
 ## 开发与测试
 
 ```bash
-npm run typecheck   # 类型检查（tsc --noEmit）
-npm test            # 运行单元测试（vitest）
+npm run typecheck   # 类型检查（tsc --noEmit，含 e2e）
+npm test            # 单元 / 组件测试（vitest）
+npm run test:e2e    # 双窗口 E2E 冒烟（playwright，需先安装浏览器）
 ```
 
 ## 目录约定

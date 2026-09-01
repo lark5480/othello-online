@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { createMockApi } from './server/mockApi';
@@ -25,6 +25,13 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), mockApiPlugin()],
   server: {
     port: 5173,
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    css: false,
+    // e2e 下的 *.spec.ts 由 Playwright 运行，vitest 不收集
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
   },
   build: {
     // 关闭 emptyOutDir：当前环境下 Vite 清空 dist 会触发 safe-delete 拦截而构建失败。

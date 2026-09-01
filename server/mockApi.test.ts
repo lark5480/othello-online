@@ -56,7 +56,8 @@ describe('本地 mock API（dev/preview 中间件）', () => {
     const j = await call(handler, `/api/room/${roomId}/join`, 'POST', { playerId: 'B' });
     expect(j.status).toBe(200);
     expect(j.json.state.status).toBe('playing');
-    expect(j.json.state.players).toEqual({ black: 'A', white: 'B' });
+    // 公开响应不回传 playerId（防冒充）；加入成功由 status 变化体现
+    expect(j.json.state.players).toEqual({ black: null, white: null });
 
     const s = await call(handler, `/api/room/${roomId}/state`, 'GET');
     expect(s.status).toBe(200);
@@ -136,5 +137,30 @@ describe('本地 mock API（dev/preview 中间件）', () => {
 
     const notPlayer = await call(handler, `/api/room/${roomId}/restart`, 'POST', { playerId: 'Z' });
     expect(notPlayer.status).toBe(403);
+  });
+
+  it('与 Edge Functions 行为对齐：非法房间码 400、小写归一、playerId 类型校验', async () => {
+    const handler = createMockApi();
+
+    // 非法格式（过短/过长/非法字符）→ 400 invalid roomId
+    for (const bad of ['ABC12', 'ABC1234', 'abc@12']) {
+      const r = await call(handler, `/api/room/${encodeURIComponent(bad)}/state`, 'GET');
+      expect(r.status).toBe(400);
+      expect(r.json.error).toBe('invalid roomId');
+    }
+
+    // create 的 playerId 类型非法 → 400
+    const bad = await call(handler, '/api/room/create', 'POST', { playerId: 123 });
+    expect(bad.status).toBe(400);
+
+    // 小写房间码归一后可用
+    const c = await call(handler, '/api/room/create', 'POST', { playerId: 'A' });
+    const roomId = c.json.roomId as string;
+    const j = await call(handler, `/api/room/${roomId.toLowerCase()}/join`, 'POST', { playerId: 'B' });
+    expect(j.status).toBe(200);
+
+    // 所有响应均不泄漏 playerId
+    const s = await call(handler, `/api/room/${roomId}/state`, 'GET');
+    expect(s.json.state.players).toEqual({ black: null, white: null });
   });
 });

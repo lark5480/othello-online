@@ -78,9 +78,9 @@ export const LOCAL_PLAYER_ID = 'local-player';  // 本地对局中玩家的固�
 2. 设置阶段：选难度（简单/中等/困难）+ 执子（黑先手 / 白后手）→ 开始对局。
 3. 对局阶段：
    - 玩家回合：`Board` 可点击，落子后 `applyMoveToState` 切换回合。
-   - AI 回合：`useEffect` 侦测到 `currentTurn === aiColor` → 显示「AI 思考中…」→ 延迟 450–800ms 后通过 **Web Worker**（`src/workers/ai.worker.ts`）异步调用 `chooseAIMove`，计算完成后 `applyMoveToState` 更新状态。主线程不阻塞，ghost 预览和动画全程流畅。
+   - AI 回合：`useEffect` 侦测到 `currentTurn === aiColor` → 显示「AI 思考中…」→ 延迟 450–800ms 后通过 **Web Worker**（`src/workers/ai.worker.ts`）异步调用 `chooseAIMove`，计算完成后 `applyMoveToState` 更新状态。主线程不阻塞，ghost 预览和动画全程流畅。每次请求带递增 id，回调只认最新请求——中途「新对局/重新设置」后，旧对局的计算结果会被直接丢弃，不会写进新棋盘。
    - 自动处理「对方无子可下 → 跳过」与连续跳过；双方均无子可下则 `finished` 弹窗（你赢 / AI 获胜 / 平局）。
-4. 落子提示开关：AI 模式默认开启（`getShowHints('ai')`），可在对局页随时切换，按设备持久化（`localStorage`）。关闭提示后棋盘仍可正常落子（与 `Board` 的 `interactive` / `isHint` 解耦一致）。
+4. 落子提示开关：AI 模式默认开启（`getShowHints('ai')`），可在对局页随时切换，按「设备 + 模式」持久化（`localStorage`，key 为 `othello_show_hints_ai`；旧版全局键 `othello_show_hints` 的既有选择会被迁移尊重）。关闭提示后棋盘仍可正常落子（与 `Board` 的 `interactive` / `isHint` 解耦一致）。
 
 ## 5. 运行与验证
 
@@ -88,7 +88,7 @@ export const LOCAL_PLAYER_ID = 'local-player';  // 本地对局中玩家的固�
 npm install
 npm run dev        # 浏览器开 /ai 即与 AI 对弈，无需后端
 npm run typecheck  # tsc --noEmit，应无错误
-npm test           # vitest，AI 引擎 18 用例 + 既有 20 用例，共 38 全绿
+npm test           # vitest：AI 引擎 18 用例 + 规则引擎 / Edge Functions（含路由层）/ mock / 工具层用例，全绿
 ```
 
 测试覆盖（`src/utils/ai.test.ts`）：评估函数性质、各难度合法落子、easy 的 rng 可控性、medium/hard 确定性、本地状态编排（先手/跳过/不抢手）、自对弈回合与终局不变量（棋子守恒、胜负一致）、hard 首步与中盘单步均 < 2s、master 在时间预算内完成且返回合法落子、easy 不受迭代加深影响、hard/master 残局精确求解、hard 稳定战胜 easy。

@@ -16,8 +16,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"]
   },
-  "include": ["src", "edge-functions", "server"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src", "edge-functions", "server", "vite.config.ts"]
 }

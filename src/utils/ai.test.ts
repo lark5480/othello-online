@@ -167,7 +167,9 @@ describe('自对弈不变量（回合管理 + 跳过 + 终局）', () => {
 });
 
 describe('难度分级强度差异', () => {
+  // 8 局完整对局模拟（hard 为深度 4 Minimax），计算量大，放宽超时
   it('hard 作为黑方对 easy(确定性随机)白方，胜局占优', () => {
+
     let hardWins = 0;
     let easyWins = 0;
     const GAMES = 8;
@@ -189,7 +191,7 @@ describe('难度分级强度差异', () => {
       else if (w === 'white') easyWins++;
     }
     expect(hardWins).toBeGreaterThan(easyWins);
-  });
+  }, 20_000);
 });
 
 describe('master 难度', () => {
