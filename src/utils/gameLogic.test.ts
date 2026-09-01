@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   BLACK,
   WHITE,
+  EMPTY,
   createInitialBoard,
   getValidMoves,
   isValidMove,
@@ -16,6 +17,7 @@ import {
   isGameOver,
   hasAnyValidMove,
   opponentOf,
+  toPublicState,
   type GameState,
 } from './gameLogic';
 
@@ -138,6 +140,22 @@ describe('胜负判定', () => {
     const board = createInitialBoard();
     board[0][0] = BLACK;
     expect(decideWinner(board)).toBe('black');
+
+    // 构造 32:32 的终局棋盘 → 和棋
+    const draw: typeof board = Array.from({ length: 8 }, () =>
+      Array.from({ length: 8 }, () => EMPTY as typeof EMPTY)
+    );
+    for (let c = 0; c < 8; c++) {
+      draw[0][c] = BLACK;
+      draw[1][c] = BLACK;
+      draw[2][c] = BLACK;
+      draw[3][c] = BLACK;
+      draw[4][c] = WHITE;
+      draw[5][c] = WHITE;
+      draw[6][c] = WHITE;
+      draw[7][c] = WHITE;
+    }
+    expect(decideWinner(draw)).toBe('draw');
   });
 });
 
@@ -165,13 +183,117 @@ describe('整局随机模拟（不变量）', () => {
   });
 });
 
-describe('边界：跳过与终局', () => {
-  it('对方无子可下时保持当前回合（跳过）', () => {
-    // 构造一个白方无合法落子的局面：仅黑方有子，白子被完全包围很少
-    // 用随机模拟已覆盖跳过；此处验证 hasAnyValidMove 与 opponentOf 一致性
+describe('边界：跳过与终局（构造性用例）', () => {
+  it('一步吃光对方全部棋子 → 直接终局（无白子则双方均无棋可下）', () => {
+    // 第 0 列：(0,0)空 (1..3,0)白 (4,0)黑。黑落 (0,0) 翻掉 3 颗白子，白方 0 子。
+    // 白 0 子时黑也无从翻转 → 双方均无棋可下 → finished，黑胜
+    const board = Array.from({ length: 8 }, () =>
+      Array.from({ length: 8 }, () => EMPTY)
+    ) as GameState['board'];
+    board[4][0] = BLACK;
+    board[1][0] = WHITE;
+    board[2][0] = WHITE;
+    board[3][0] = WHITE;
+
+    let s = createInitialState('TEST01', 'pb');
+    s = { ...joinState(s, 'pw'), board, status: 'playing' as const };
+
+    const res = applyMoveToState(s, 'pb', 0, 0);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(countStones(res.state.board).white).toBe(0);
+      expect(res.state.status).toBe('finished');
+      expect(res.state.winner).toBe('black');
+    }
+  });
+
+  it('跳过分支：落子后对方无棋可下且己方仍可下 → 保持当前回合', () => {
+    // 固定种子随机对弈，搜索真实出现的「跳过」局面做构造性断言
+    // （种子固定 → 序列确定，测试恒定可复现；黑白棋随机对局中跳过高频出现）
+    let seed = 20260831;
+    const rng = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    let found = false;
+    search: for (let game = 0; game < 500; game++) {
+      let s = joinState(createInitialState('TEST01', 'pb'), 'pw');
+      let guard = 0;
+      while (s.status === 'playing' && guard < 100) {
+        guard++;
+        const moves = getValidMoves(s.board, s.currentTurn);
+        const pick = moves[Math.floor(rng() * moves.length)];
+        const res = applyMoveToState(s, s.players[s.currentTurn]!, pick.row, pick.col);
+        if (!res.ok) break;
+        if (
+          res.state.status === 'playing' &&
+          res.state.currentTurn === s.currentTurn
+        ) {
+          // 跳过发生：落子方落完后仍是自己的回合
+          expect(hasAnyValidMove(res.state.board, opponentOf(s.currentTurn))).toBe(false);
+          expect(hasAnyValidMove(res.state.board, s.currentTurn)).toBe(true);
+          expect(res.state.moveCount).toBe(s.moveCount + 1);
+          found = true;
+          break search;
+        }
+        s = res.state;
+      }
+    }
+    expect(found).toBe(true);
+  });
+
+  it('落子后棋盘下满 → 双方无棋可下，对局结束并判定胜负', () => {
+    // 全盘黑，仅 (0,0) 空与 (1,0)(2,0) 白：黑落 (0,0) 翻 2 白后全满
+    const board = Array.from({ length: 8 }, () =>
+      Array.from({ length: 8 }, () => BLACK)
+    ) as GameState['board'];
+    board[0][0] = EMPTY;
+    board[1][0] = WHITE;
+    board[2][0] = WHITE;
+
+    let s = createInitialState('TEST01', 'pb');
+    s = { ...joinState(s, 'pw'), board, status: 'playing' as const };
+
+    const res = applyMoveToState(s, 'pb', 0, 0);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(countStones(res.state.board)).toEqual({ black: 64, white: 0, empty: 0 });
+      expect(res.state.status).toBe('finished');
+      expect(res.state.winner).toBe('black');
+    }
+  });
+
+  it('异常坐标（越界/小数/NaN）一律 400，不产生非法棋盘', () => {
+    const s = joinState(createInitialState('TEST01', 'pb'), 'pw');
+    for (const [row, col] of [
+      [-1, 3],
+      [8, 3],
+      [3, -1],
+      [3, 8],
+      [3.5, 3],
+      [NaN, NaN],
+    ] as const) {
+      const res = applyMoveToState(s, 'pb', row, col);
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.status).toBe(400);
+    }
+    expect(countStones(s.board)).toEqual({ black: 2, white: 2, empty: 60 }); // 原状态未被污染
+  });
+
+  it('toPublicState：抹掉双方 playerId 且不修改原状态', () => {
+    let s = createInitialState('TEST01', 'pb');
+    s = joinState(s, 'pw');
+    const pub = toPublicState(s);
+    expect(pub.players).toEqual({ black: null, white: null });
+    expect(pub.board).toEqual(s.board);
+    expect(pub.status).toBe(s.status);
+    expect(s.players).toEqual({ black: 'pb', white: 'pw' }); // 原对象保持含 id
+  });
+
+  it('基础工具一致性', () => {
     const board = createInitialBoard();
     expect(opponentOf('black')).toBe('white');
-    expect(typeof hasAnyValidMove(board, 'white')).toBe('boolean');
+    expect(hasAnyValidMove(board, 'white')).toBe(true);
     expect(isGameOver(board)).toBe(false);
   });
 });

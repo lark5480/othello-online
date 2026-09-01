@@ -10,18 +10,10 @@ import {
   joinState,
   applyMoveToState,
   restartState,
+  toPublicState,
   type GameState,
 } from '../src/utils/gameLogic';
-
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-function genCode(): string {
-  let id = '';
-  for (let i = 0; i < 6; i++) {
-    id += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-  }
-  return id;
-}
+import { randomRoomCodeSuffix, normalizeRoomId } from '../src/utils/roomCode';
 
 const store = new Map<string, GameState>();
 
@@ -66,18 +58,20 @@ export function createMockApi() {
       if (typeof playerId !== 'string' || !playerId) {
         return sendJson(res, 400, { error: 'playerId required' });
       }
-      const roomId = genCode();
+      const roomId = randomRoomCodeSuffix(6);
       const state = createInitialState(roomId, playerId);
       store.set(roomId, state);
-      return sendJson(res, 201, { roomId, state });
+      return sendJson(res, 201, { roomId, state: toPublicState(state) });
     }
 
-    // /api/room/:roomId/(join|state|move|restart)
-    const m = url.match(/^\/api\/room\/([A-Z0-9]{6})\/(join|state|move|restart)$/i);
+    // /api/room/:roomId/(join|state|move|restart) —— 与 Edge Functions 一致：
+    // 先宽松匹配路径，再做与线上一致的房间码校验（大写归一 + 格式）
+    const m = url.match(/^\/api\/room\/([^/]+)\/(join|state|move|restart)$/);
     if (!m) return next();
 
-    const roomId = m[1].toUpperCase();
     const action = m[2];
+    const roomId = normalizeRoomId(m[1]);
+    if (!roomId) return sendJson(res, 400, { error: 'invalid roomId' });
     const state = store.get(roomId);
     if (!state) return sendJson(res, 404, { error: 'room not found' });
 
@@ -95,11 +89,11 @@ export function createMockApi() {
         updated = joinState(state, playerId);
         store.set(roomId, updated);
       }
-      return sendJson(res, 200, { state: updated });
+      return sendJson(res, 200, { state: toPublicState(updated) });
     }
 
     if (method === 'GET' && action === 'state') {
-      return sendJson(res, 200, { state });
+      return sendJson(res, 200, { state: toPublicState(state) });
     }
 
     if (method === 'POST' && action === 'move') {
@@ -118,7 +112,7 @@ export function createMockApi() {
       const result = applyMoveToState(state, playerId, row, col);
       if (!result.ok) return sendJson(res, result.status, { error: result.error });
       store.set(roomId, result.state);
-      return sendJson(res, 200, { state: result.state });
+      return sendJson(res, 200, { state: toPublicState(result.state) });
     }
 
     if (method === 'POST' && action === 'restart') {
@@ -135,7 +129,7 @@ export function createMockApi() {
       }
       const updated = restartState(state);
       store.set(roomId, updated);
-      return sendJson(res, 200, { state: updated });
+      return sendJson(res, 200, { state: toPublicState(updated) });
     }
 
     return sendJson(res, 405, { error: 'method not allowed' });

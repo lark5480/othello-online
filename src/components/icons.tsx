@@ -54,3 +54,50 @@ export function ShareIcon({ size = 16, ...rest }: IconProps) {
     </svg>
   );
 }
+
+export function SoundOnIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M4 9v6h3l5 4V5L7 9H4z" />
+      <path d="M16 8.5a4 4 0 0 1 0 7" />
+      <path d="M18.5 6a7 7 0 0 1 0 12" />
+    </svg>
+  );
+}
+
+export function SoundOffIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M4 9v6h3l5 4V5L7 9H4z" />
+      <path d="M16 9l5 6M21 9l-5 6" />
+    </svg>
+  );
+}
+
+export function CloseIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+export function TrophyIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M7 4h10v4a5 5 0 0 1-10 0V4z" />
+      <path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" />
+      <path d="M12 13v4M9 21h6M10 17h4" />
+    </svg>
+  );
+}
+
+export function HistoryIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v4h4" />
+      <path d="M12 8v4l3 2" />
+    </svg>
+  );
+}

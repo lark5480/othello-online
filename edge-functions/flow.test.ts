@@ -51,7 +51,10 @@ describe('Edge Functions 全流程（内存 KV 模拟）', () => {
     const j = await parse(await joinRoom(ctx({ roomId, playerId: white }, { roomId }, kv)));
     expect(j.status).toBe(200);
     expect(j.body.state.status).toBe('playing');
-    expect(j.body.state.players.white).toBe(white);
+    // 公开响应不回传 playerId（落子凭证不能外泄）；白方就位由 KV 原始值确认
+    expect(j.body.state.players.white).toBeNull();
+    const raw = JSON.parse((await kv.get(roomId)) as string) as GameState;
+    expect(raw.players.white).toBe(white);
 
     const gs = await parse(await getState(ctx({}, { roomId }, kv)));
     expect(gs.status).toBe(200);
@@ -159,5 +162,50 @@ describe('Edge Functions 全流程（内存 KV 模拟）', () => {
 
     const notPlayer = await parse(await restart(ctx({ playerId: 'z' }, { roomId }, kv)));
     expect(notPlayer.status).toBe(403);
+  });
+
+  it('非法房间码返回 400 invalid roomId（所有端点）', async () => {
+    const kv = new MemKV();
+    for (const fn of [
+      (rid: string) => joinRoom(ctx({ playerId: 'x' }, { roomId: rid }, kv)),
+      (rid: string) => getState(ctx({}, { roomId: rid }, kv)),
+      (rid: string) => move(ctx({ playerId: 'x', row: 2, col: 3 }, { roomId: rid }, kv)),
+      (rid: string) => restart(ctx({ playerId: 'x' }, { roomId: rid }, kv)),
+    ]) {
+      for (const bad of ['ABC12', 'ABC1234', 'abc@12', '']) {
+        const r = await parse(await fn(bad));
+        expect(r.status).toBe(400);
+        expect(r.body.error).toBe('invalid roomId');
+      }
+    }
+  });
+
+  it('小写房间码经大写归一后可正常访问', async () => {
+    const kv = new MemKV();
+    const c = await parse(await createRoom(ctx({ playerId: 'a' }, {}, kv)));
+    const roomId = c.body.roomId as string;
+    const j = await parse(
+      await joinRoom(ctx({ playerId: 'b' }, { roomId: roomId.toLowerCase() }, kv))
+    );
+    expect(j.status).toBe(200);
+    const s = await parse(
+      await getState(ctx({}, { roomId: roomId.toLowerCase() }, kv))
+    );
+    expect(s.status).toBe(200);
+    expect(s.body.state.status).toBe('playing');
+  });
+
+  it('create/join 的 playerId 类型非法返回 400', async () => {
+    const kv = new MemKV();
+    for (const bad of [undefined, 123, {}, '', []]) {
+      const c = await parse(await createRoom(ctx({ playerId: bad }, {}, kv)));
+      expect(c.status).toBe(400);
+    }
+    const c = await parse(await createRoom(ctx({ playerId: 'a' }, {}, kv)));
+    const roomId = c.body.roomId as string;
+    const j = await parse(
+      await joinRoom(ctx({ playerId: 42 }, { roomId }, kv))
+    );
+    expect(j.status).toBe(400);
   });
 });

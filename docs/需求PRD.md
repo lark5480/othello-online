@@ -165,8 +165,8 @@ Edge Functions **不支持 WebSocket**（但 Node Functions 支持，见 5.2）�
   ],
   "currentTurn": "black",     // black | white
   "players": {
-    "black": "player_abc123",
-    "white": "player_xyz789"
+    "black": null,            // 对外响应恒为 null（见 6.2）；playerId 仅存于 KV
+    "white": null
   },
   "moveCount": 4,
   "lastMove": { "row": 2, "col": 3 },
@@ -181,7 +181,11 @@ Edge Functions **不支持 WebSocket**（但 Node Functions 支持，见 5.2）�
 
 ### 6.2 玩家身份
 
-不注册不登录，用浏览器 `localStorage` 生成一个随机 `playerId`，加入房间时绑定。断线后凭同一 `playerId` 重连（见 R-05）。
+不注册不登录，用浏览器 `localStorage` 生成一个随机 `playerId`（WebCrypto，`p_` + 16 字符），加入房间时绑定。断线后凭同一 `playerId` 重连（见 R-05）。
+
+**凭证不外发**：playerId 兼作落子凭证，而 `GET /state` 无鉴权（任何拿到房间码的人都能观战）。因此所有 API 响应里的 `state.players` 恒为 `{ black: null, white: null }`（`toPublicState` 脱敏）；真实 playerId 只存在 KV 中供服务端校验。前端识别自己是黑/白方，靠本地房间颜色记忆（create→黑、join→白，`player.ts` 的 `rememberRoomColor`）。
+
+房间码规则：32 字符集（去掉易混的 0/O/1/I）、6 位；URL/输入框传入先大写归一（小写等价），格式非法返回 `400 invalid roomId`。
 
 ---
 
@@ -396,7 +400,7 @@ edgeone pages deploy . -n othello-online
 | 等待对方加入 | 3 秒 | 低频 |
 | 等待对方落子 | 2 秒 | 中频 |
 | 自己回合 | 不轮询 | 无需 |
-| 游戏结束 | 停止轮询 | — |
+| 游戏结束 | 5 秒 | 低频轮询：对手点「再来一局」后本端自动恢复，无需手动刷新 |
 
 ### 10.4 SPA fallback（必须配置，否则 /room/:roomId 刷新 404）
 
@@ -435,6 +439,10 @@ EdgeOne Pages 不会自动把未知前端路由回退到 `index.html`，需二�
 - [x] AI 对战模式（Minimax + 迭代加深，难度分级：简单/中等/困难/大师；引擎 `src/utils/ai.ts`，Web Worker 异步计算 `src/workers/ai.worker.ts`，离线单机，详见《AI对战模式.md》）
 - [x] 落子预览（ghost disc + 翻转高亮）：hover 合法格显示半透明己方棋子和将被翻转的棋子脉冲描边
 - [x] 暗色模式：`prefers-color-scheme` 自动切换设计令牌，全部组件通过语义化 CSS 类适配
+- [x] 程序化音效：Web Audio 合成落子/翻转/胜负短音（零音频文件），`othello_sound` 静音开关默认开
+- [x] 走子历史侧栏：`MoveHistory` 展示当前对局走子序列（Room 与 AIGame 均接入）
+- [x] 本地战绩：按难度记录胜/负/和局与最大子差（`othello_stats`，人机对战）
+- [x] CI：GitHub Actions 自动跑 typecheck + 单测 + Playwright 双窗口 E2E（push/PR 触发）
 - [ ] 观战功能
 - [ ] 对局回放
 - [ ] 落子提示说明：提示为客户端视觉辅助，按设备持久化；若需全局一致的辅助（如房间级 assist 开关）需服务端字段。**solo/AI 模式默认开启提示（见 `getDefaultShowHints`），联网对战默认关闭以保公平。**

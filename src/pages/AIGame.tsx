@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createAIGameState, type Difficulty } from '../utils/ai';
+import { chooseAIMove, createAIGameState, type Difficulty } from '../utils/ai';
 import { getShowHints, setShowHints } from '../utils/hints';
 import {
   applyMoveToState,
@@ -13,7 +13,12 @@ import {
 } from '../utils/gameLogic';
 import Board from '../components/Board';
 import GameInfo from '../components/GameInfo';
-import { HomeIcon, RestartIcon } from '../components/icons';
+import { HomeIcon, RestartIcon, SoundOnIcon, SoundOffIcon } from '../components/icons';
+import { getSoundEnabled, toggleSound } from '../utils/sound';
+import { useBoardSound } from '../hooks/useBoardSound';
+import { getStats, recordResult, type Outcome, type Stats } from '../utils/stats';
+import MoveHistory from '../components/MoveHistory';
+import StatsPanel from '../components/StatsPanel';
 
 const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   easy: '简单',
@@ -42,17 +47,29 @@ export default function AIGame() {
   const [thinking, setThinking] = useState(false);
   const [showHints, setShowHintsState] = useState<boolean>(() => getShowHints('ai'));
 
+  // 音效开关（全局偏好，持久化于 localStorage）
+  const [soundOn, setSoundOn] = useState<boolean>(() => getSoundEnabled());
+  // 当前难度的本地战绩（终局后刷新）
+  const [stats, setStats] = useState<Stats>(() => getStats(difficulty));
+  // 防止终局音效/战绩被重复记录（重开时复位）
+  const recordedRef = useRef(false);
+
   const thinkingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const requestIdRef = useRef(0);
 
-  // 初始化 / 销毁 Worker
+  // 初始化 / 销毁 Worker（构造失败则降级到主线程计算，见下方 AI 回合）
   useEffect(() => {
-    const worker = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' });
+    let worker: Worker | null = null;
+    try {
+      worker = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' });
+    } catch {
+      worker = null; // 极端环境（无 Worker 支持）：workerRef 保持 null，AI 回合改用主线程
+    }
     workerRef.current = worker;
     return () => {
-      worker.terminate();
+      worker?.terminate();
       workerRef.current = null;
     };
   }, []);
@@ -63,13 +80,24 @@ export default function AIGame() {
   const myTurn =
     !!state && state.status === 'playing' && state.currentTurn === myColor && !thinking;
 
-  // 落子提示开关（AI 模式默认开启，按设备持久化）
+  // 棋盘音效：落子自动发声，终局按视角播放胜/负/和
+  useBoardSound({
+    state,
+    resolveOutcome: (s) => (s.winner === myColor ? 'win' : s.winner === null ? 'draw' : 'loss'),
+  });
+
+  // 落子提示开关（AI 模式默认开启，按设备+模式持久化）
   const toggleShowHints = () => {
     setShowHintsState((prev) => {
       const next = !prev;
-      setShowHints(next);
+      setShowHints('ai', next);
       return next;
     });
+  };
+
+  // 音效开关：切换并持久化全局偏好
+  const toggleSoundOn = () => {
+    setSoundOn(toggleSound());
   };
 
   // 开始 / 重开：用当前设置重建本地对局状态
@@ -77,6 +105,8 @@ export default function AIGame() {
     if (timerRef.current) clearTimeout(timerRef.current);
     thinkingRef.current = false;
     setThinking(false);
+    recordedRef.current = false;
+    setStats(getStats(difficulty)); // 刷新当前难度的战绩展示
     setState(createAIGameState(playerColor, difficulty));
     setStarted(true);
   };
@@ -89,8 +119,6 @@ export default function AIGame() {
     if (thinkingRef.current) return;
 
     const worker = workerRef.current;
-    if (!worker) return;
-
     thinkingRef.current = true;
     setThinking(true);
     // 模拟思考节奏，体验更自然；计算本身是同步的，延迟后再执行以避免卡顿观感
@@ -98,10 +126,11 @@ export default function AIGame() {
     const currentRequestId = ++requestIdRef.current;
 
     timerRef.current = setTimeout(() => {
-      if (!state || !worker) return;
-      const handler = (e: MessageEvent<{ id: number; move: Move | null }>) => {
-        if (e.data.id !== currentRequestId || !e.data.move) return;
-        const move = e.data.move;
+      if (state.status !== 'playing' || state.currentTurn !== aiColor) return;
+
+      const apply = (move: Move | null) => {
+        // 只认最新一次请求的响应：对局被重开/重设后，旧计算结果直接丢弃
+        if (currentRequestId !== requestIdRef.current || !move) return;
         setState((prev) => {
           if (!prev || prev.status !== 'playing' || prev.currentTurn !== aiColor) return prev;
           const res = applyMoveToState(prev, prev.players[aiColor]!, move.row, move.col);
@@ -110,13 +139,20 @@ export default function AIGame() {
         thinkingRef.current = false;
         setThinking(false);
       };
-      worker.addEventListener('message', handler, { once: true });
-      worker.postMessage({
-        id: currentRequestId,
-        board: state.board,
-        aiPlayer: aiColor,
-        difficulty,
-      });
+
+      if (worker) {
+        const handler = (e: MessageEvent<{ id: number; move: Move | null }>) => apply(e.data.move);
+        worker.addEventListener('message', handler, { once: true });
+        worker.postMessage({
+          id: currentRequestId,
+          board: state.board,
+          aiPlayer: aiColor,
+          difficulty,
+        });
+      } else {
+        // 主线程兜底：Worker 不可用时仍用同一引擎落子，避免 AI 卡死
+        apply(chooseAIMove(state.board, aiColor, difficulty));
+      }
     }, delay);
 
     return () => {
@@ -137,6 +173,19 @@ export default function AIGame() {
     const res = applyMoveToState(state, state.players[myColor]!, row, col);
     if (res.ok) setState(res.state);
   };
+
+  // 终局记录战绩（仅一次），并刷新战绩面板
+  useEffect(() => {
+    if (state?.status === 'finished' && !recordedRef.current) {
+      recordedRef.current = true;
+      const { black, white } = countStones(state.board);
+      const outcome: Outcome =
+        state.winner === myColor ? 'win' : state.winner === null ? 'draw' : 'loss';
+      setStats(recordResult(difficulty, outcome, Math.abs(black - white)));
+    } else if (state?.status !== 'finished') {
+      recordedRef.current = false;
+    }
+  }, [state, difficulty, myColor]);
 
   if (!started || !state) {
     return (
@@ -195,6 +244,10 @@ export default function AIGame() {
               </button>
             </div>
           </Section>
+
+          <div className="mt-6">
+            <StatsPanel difficulty={difficulty} stats={stats} />
+          </div>
 
           <button
             type="button"
@@ -265,6 +318,36 @@ export default function AIGame() {
           </button>
         </div>
 
+        <div className="card flex items-center justify-between gap-4 p-4">
+          <div className="flex items-center gap-2">
+            <span className={soundOn ? 'text-strong' : 'text-muted'}>
+              {soundOn ? <SoundOnIcon size={18} /> : <SoundOffIcon size={18} />}
+            </span>
+            <div>
+              <div className="text-strong text-sm font-medium">音效</div>
+              <div className="text-muted mt-0.5 text-xs">
+                落子与胜负提示音（Web Audio，无需音频文件）
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={soundOn}
+            aria-label="音效开关"
+            onClick={toggleSoundOn}
+            className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${
+              soundOn ? 'toggle-on' : 'toggle-off'
+            }`}
+          >
+            <span
+              className={`toggle-knob h-5 w-5 rounded-full shadow transition-transform ${
+                soundOn ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        </div>
+
         <div className="flex justify-center">
           <Board
             board={state.board}
@@ -299,6 +382,11 @@ export default function AIGame() {
           >
             重新设置
           </button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <StatsPanel difficulty={difficulty} stats={stats} />
+          <MoveHistory state={state} />
         </div>
 
         {state.status === 'finished' && (

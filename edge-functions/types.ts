@@ -14,9 +14,7 @@ export interface EdgeContext {
   params: Record<string, string>;
   env: Record<string, unknown> & {
     OTHELLO_KV?: KVNamespace;
-    // 兜底存储：当 EdgeOne KV 存储未开通/审批未过时，可用任意兼容 Redis REST 的
-    // 无服务器 KV（如 Upstash）作为共享状态后端，无需 KV 审批。
-    UPSTASH_REDIS_REST_URL?: string;
-    UPSTASH_REDIS_REST_TOKEN?: string;
+    // 自托管时如需其他存储后端，在 lib/kv.ts 的 getKV 中扩展；
+    // 未声明的环境变量不要留在类型里，避免误导部署配置。
   };
 }

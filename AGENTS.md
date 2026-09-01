@@ -6,8 +6,8 @@
 
 - 前端：React 18 + Vite 6 + TypeScript + Tailwind CSS v4（CSS-first，配置靠 `src/index.css` 的 `:root` 设计令牌，无 `tailwind.config.js`）。
 - 后端：Edge Functions（V8 runtime）+ KV 存储；前端用轮询（`usePolling`）同步状态。
-- 测试：Vitest（`npm test`）。
-- 部署：EdgeOne Makers，构建 `npm run build` → 产物 `dist/`；支持 GitHub 自动部署或 `edgeone pages deploy`。
+- 测试：Vitest（`npm test`，jsdom + jest-dom，setup 在 `src/test/setup.ts`）+ Playwright 双窗口 E2E（`npm run test:e2e`）。
+- 部署：EdgeOne Makers，构建 `npm run build` → 产物 `dist/`；支持 GitHub 自动部署或 `edgeone pages deploy`。CI：`.github/workflows/ci.yml`（typecheck + 单测 + E2E）。
 
 ## 常用命令
 
@@ -16,8 +16,9 @@ npm install        # 安装依赖
 npm run dev        # 本地开发（含 mockApi 中间件，见下）
 npm run build      # 生产构建到 dist/
 npm run preview    # 预览构建产物
-npm run typecheck  # tsc --noEmit
+npm run typecheck  # tsc --noEmit（含 e2e 的 tsconfig）
 npm test           # vitest run
+npm run test:e2e   # playwright test（双窗口冒烟，需先 npx playwright install chromium）
 ```
 
 > 注意：**不要替用户启动/重启 dev server 或后端进程**，也不要用 `java -jar`/进程方式拉起任何服务。把"如何运行/验证"的命令交给用户自己执行。
@@ -27,14 +28,18 @@ npm test           # vitest run
 ```
 src/
   pages/        Home（建/进房间）、Room（联机对局页，提示开关在此）、AIGame（人机对战页，路由 /ai）
-  components/   Board / Cell / GameInfo / icons
-  hooks/        usePolling
-  utils/        gameLogic.ts（纯规则引擎，前后端共用）、ai.ts（AI 对手引擎：Minimax+剪枝、难度分级）、api.ts、player.ts、hints.ts（提示开关持久化）
+  components/   Board / Cell / GameInfo / MoveHistory / StatsPanel / ThemeToggle / icons
+  hooks/        usePolling、useBoardSound
+  workers/      ai.worker.ts（AI 计算放 Web Worker，主线程不阻塞）
+  utils/        gameLogic.ts（纯规则引擎，前后端共用）、ai.ts（AI 对手引擎：Minimax+剪枝、难度分级）、api.ts、player.ts、roomCode.ts（房间码生成/校验，前后端共用）、hints.ts（提示开关持久化，按模式分 key）、sound.ts / stats.ts / theme.ts
+  test/         setup.ts（Vitest：jsdom + jest-dom）
   index.css     设计令牌 + 棋盘/棋子/提示样式
 edge-functions/api/room/   服务端：create/join/[roomId]/{state,move,restart}
+edge-functions/lib/        router.ts（镜像文件路由的最小路由器，测试用）、kv.ts、types.ts
 server/mockApi.ts           Vite 中间件，本地免 EdgeOne 验证（复用 gameLogic + 内存 Map 当 KV）
+e2e/                        Playwright 双窗口冒烟（room.spec.ts）
 scripts/                    类型剥离自测脚本
-docs/                       需求PRD.md、部署指南.md
+docs/                       需求PRD.md、部署指南.md、AI对战模式.md、竞品对比与优化分析.md
 edgeone.json                SPA fallback 配置
 ```
 
@@ -43,8 +48,10 @@ edgeone.json                SPA fallback 配置
 1. **Edge Functions 是 V8 runtime，不能 import npm 包。** 游戏规则等纯逻辑必须写在 `src/utils/gameLogic.ts`（零依赖纯 TS/JS），Edge Functions 跨目录 `import` 它复用；不要在 edge-functions 里引入第三方库。
 2. **KV 仅 Edge Functions 可调用**，value 必须是字符串（JSON 序列化）；存在最终一致性（约数十秒延迟）。前端用 `currentTurn` + `updatedAt` 过滤陈旧数据（`Room.tsx` 的 `applyState`）。
 3. **SPA 必须配 fallback**：`/room/:roomId` 刷新会 404，已由 `edgeone.json` 的 rewrite 处理；本地由 Vite 自带 history fallback 覆盖。
-4. **本地免 EdgeOne 验证**：`server/mockApi.ts` 仅在 dev/preview 挂载，端点形状与 Edge Functions 一致。用户只需 `npm run dev` 即可开两个浏览器窗口对弈。**Edge Functions 的测试要走真实路由层**，不要直接调函数绕过 `context.params`（曾因此测试绿但生产 join 路由坏）。
-5. **落子提示（showHints）已解耦**：`Board` 中 `interactive`（可点击，按合法格）与 `isHint`（视觉，按合法格+开关）是两个独立集合。隐藏提示后棋盘仍需可点击——改提示逻辑时不要把它们重新绑死。`src/utils/hints.ts` 的 `getDefaultShowHints(mode)` 预留了模式感知默认值（联网默认关、solo/ai 默认开）。
+4. **本地免 EdgeOne 验证**：`server/mockApi.ts` 仅在 dev/preview 挂载，端点形状与 Edge Functions 一致（含错误码与脱敏行为，改任一侧必须同步另一侧）。用户只需 `npm run dev` 即可开两个浏览器窗口对弈。**Edge Functions 的测试要走真实路由层**：用 `edge-functions/lib/router.ts` 的 `routeRequest(method, url, env, body)` 按 URL 分派（镜像平台文件路由与 `[roomId]` 动态段提取），不要直接调 handler 函数绕过 `context.params`（曾因此测试绿但生产 join 路由坏）。
+5. **落子提示（showHints）已解耦**：`Board` 中 `interactive`（可点击，按合法格）与 `isHint`（视觉，按合法格+开关）是两个独立集合。隐藏提示后棋盘仍需可点击——改提示逻辑时不要把它们重新绑死。`src/utils/hints.ts` 按模式分 localStorage key（联网默认关、solo/ai 默认开），并迁移旧全局键 `othello_show_hints`。
+6. **playerId 兼作落子凭证，绝不外发**：所有 API 响应中的 `state.players` 必须经 `toPublicState()`（gameLogic.ts）把双方 playerId 置 null——`GET /state` 是无鉴权的，泄漏 playerId 等于把落子权交给任何拿到房间码的人。前端识别自己是哪一方用 `player.ts` 的房间颜色记忆（`rememberRoomColor`/`recallRoomColor`），不要依赖服务端回传。
+7. **房间码统一走 `src/utils/roomCode.ts`**：生成用 WebCrypto（无则退回 Math.random）、校验 `isValidRoomId`（32 字符集、6 位）、URL 传入先 `normalizeRoomId`（trim+大写归一，非法返回 null → 400 invalid roomId）。Edge Functions 与 mockApi 两端必须共用，防行为漂移。
 
 ## 代码约定
 
@@ -54,6 +61,8 @@ edgeone.json                SPA fallback 配置
 
 ## 验证清单
 
-- 改完跑 `npm run typecheck` 与 `npm test`（含核心算法 + Edge Functions 全流程测试）。
+- 改完跑 `npm run typecheck` 与 `npm test`（含核心算法 + Edge Functions 全流程测试 + 组件/页面/hook 测试）。
+- 涉及前端交互（Board/Room/AIGame）改动：确认相关组件测试同步更新，必要时跑 `npm run test:e2e` 双窗口冒烟。
 - 涉及提示/棋盘视觉：确认"关提示仍可落子"、最后落子标记（青色 `--last-move`）不与提示点（琥珀 `--hint`）混淆。
 - 部署相关改动：提醒用户用 `edgeone pages dev`(8088) 或 `edgeone pages deploy` 在真实环境验证 KV 与 fallback（本环境无法联网验证）。
+- 文档同步：改完代码后检查 `docs/`、`README.md`、`AGENTS.md` 是否有过时描述（文件/命令/接口/数据），同步更新或删除无效内容。

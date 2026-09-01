@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
-import { getPlayerId } from '../utils/player';
+import { getPlayerId, recallRoomColor, rememberRoomColor } from '../utils/player';
 import { ApiError, createRoom, isStorageError, joinRoom, STORAGE_HINT } from '../utils/api';
 
 function Logo() {
@@ -24,6 +24,7 @@ export default function Home() {
     setError(null);
     try {
       const { roomId } = await createRoom(getPlayerId());
+      rememberRoomColor(roomId, 'black'); // 创建者执黑
       navigate(`/room/${roomId}`);
     } catch (e) {
       setError(isStorageError(e) ? STORAGE_HINT : '创建房间失败,请稍后重试');
@@ -42,6 +43,9 @@ export default function Home() {
     setError(null);
     try {
       await joinRoom(roomId, getPlayerId());
+      // 服务器不回传 playerId，客户端记下「我执白」用于对局页识别颜色；
+      // 已有记忆（如创建者重进自己房间）不覆盖
+      if (!recallRoomColor(roomId)) rememberRoomColor(roomId, 'white');
       navigate(`/room/${roomId}`);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : '';

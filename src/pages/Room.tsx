@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getPlayerId } from '../utils/player';
+import { getPlayerId, recallRoomColor } from '../utils/player';
 import { getShowHints, setShowHints } from '../utils/hints';
 import { ApiError, getRoomState, isStorageError, postMove, restartRoom, STORAGE_HINT } from '../utils/api';
 import { countStones, getValidMoves, type GameState, type Player } from '../utils/gameLogic';
 import { usePolling } from '../hooks/usePolling';
 import Board from '../components/Board';
 import GameInfo from '../components/GameInfo';
-import { HomeIcon, RestartIcon } from '../components/icons';
+import { HomeIcon, RestartIcon, SoundOnIcon, SoundOffIcon } from '../components/icons';
+import { getSoundEnabled, toggleSound } from '../utils/sound';
+import { useBoardSound } from '../hooks/useBoardSound';
+import MoveHistory from '../components/MoveHistory';
 
 export default function Room() {
   const { roomId = '' } = useParams();
@@ -20,15 +23,21 @@ export default function Room() {
   const [copied, setCopied] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [showHints, setShowHintsState] = useState<boolean>(() => getShowHints('online'));
+  const [soundOn, setSoundOn] = useState<boolean>(() => getSoundEnabled());
   const lastAt = useRef(0);
 
   // 落子提示开关：切换即持久化到 localStorage（联网模式默认关，靠棋力；休闲可开启）
   const toggleShowHints = () => {
     setShowHintsState((prev) => {
       const next = !prev;
-      setShowHints(next);
+      setShowHints('online', next);
       return next;
     });
+  };
+
+  // 音效开关：切换并持久化全局偏好
+  const toggleSoundOn = () => {
+    setSoundOn(toggleSound());
   };
 
   // 应用远端状态，并通过 updatedAt 过滤 KV 最终一致性带来的陈旧数据
@@ -57,15 +66,24 @@ export default function Room() {
     };
   }, [roomId]);
 
-  const myColor: Player | null = state
-    ? state.players.black === playerId
-      ? 'black'
-      : state.players.white === playerId
-        ? 'white'
-        : null
-    : null;
+  // 服务端 state 不再回传 playerId（防冒充），自己是哪一方从本地房间颜色记忆读取；
+  // 没有记忆 = 未参与该房间 = 观战者
+  const myColor: Player | null = useMemo(() => recallRoomColor(roomId), [roomId]);
   const myTurn =
     state?.status === 'playing' && myColor !== null && state.currentTurn === myColor;
+
+  // 棋盘音效：落子自动发声，终局按视角播放胜/负/和（旁观者 myColor 为 null → 中性「和」音）
+  useBoardSound({
+    state,
+    resolveOutcome: (s) =>
+      myColor === null
+        ? 'draw'
+        : s.winner === myColor
+          ? 'win'
+          : s.winner === null
+            ? 'draw'
+            : 'loss',
+  });
 
   let pollEnabled = false;
   let pollInterval = 3000;
@@ -182,7 +200,13 @@ export default function Room() {
             </button>
           </div>
         ) : !state ? (
-          <div className="text-muted card p-10 text-center">加载中…</div>
+          error ? (
+            <div className="card p-10 text-center">
+              <p className="text-error">{error}</p>
+            </div>
+          ) : (
+            <div className="text-muted card p-10 text-center">加载中…</div>
+          )
         ) : (
           <>
             <GameInfo
@@ -200,23 +224,53 @@ export default function Room() {
                   高亮可落子位置（休闲友好；竞技默认关闭，靠棋力）
                 </div>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showHints}
-                aria-label="显示落子提示"
-                onClick={toggleShowHints}
-                className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${
-                  showHints ? 'toggle-on' : 'toggle-off'
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showHints}
+              aria-label="显示落子提示"
+              onClick={toggleShowHints}
+              className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${
+                showHints ? 'toggle-on' : 'toggle-off'
+              }`}
+            >
+              <span
+                className={`toggle-knob h-5 w-5 rounded-full shadow transition-transform ${
+                  showHints ? 'translate-x-5' : 'translate-x-0.5'
                 }`}
-              >
-                <span
-                  className={`toggle-knob h-5 w-5 rounded-full shadow transition-transform ${
-                    showHints ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
+              />
+            </button>
+          </div>
+
+          <div className="card flex items-center justify-between gap-4 p-4">
+            <div className="flex items-center gap-2">
+              <span className={soundOn ? 'text-strong' : 'text-muted'}>
+                {soundOn ? <SoundOnIcon size={18} /> : <SoundOffIcon size={18} />}
+              </span>
+              <div>
+                <div className="text-strong text-sm font-medium">音效</div>
+                <div className="text-muted mt-0.5 text-xs">
+                  落子与胜负提示音（Web Audio，无需音频文件）
+                </div>
+              </div>
             </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={soundOn}
+              aria-label="音效开关"
+              onClick={toggleSoundOn}
+              className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${
+                soundOn ? 'toggle-on' : 'toggle-off'
+              }`}
+            >
+              <span
+                className={`toggle-knob h-5 w-5 rounded-full shadow transition-transform ${
+                  soundOn ? 'translate-x-5' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
 
             <div className="flex justify-center">
               <Board
@@ -229,6 +283,8 @@ export default function Room() {
             onMove={handleMove}
           />
             </div>
+
+            <MoveHistory state={state} />
 
             {error && <p className="text-error text-center text-sm">{error}</p>}
 

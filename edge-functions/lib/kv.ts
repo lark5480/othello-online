@@ -30,7 +30,13 @@ export async function getState(
   roomId: string
 ): Promise<GameState | null> {
   const raw = await kv.get(roomId);
-  return raw ? (JSON.parse(raw) as GameState) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as GameState;
+  } catch {
+    // 值损坏（脏写/截断）当作房间不存在处理，避免未捕获异常变成 500
+    return null;
+  }
 }
 
 export async function putState(

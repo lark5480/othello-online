@@ -173,7 +173,7 @@ export function isGameOver(board: Board): boolean {
   );
 }
 
-/** 依据棋子数判定胜负：黑多黑胜、白多白胜、相等和棋；棋盘未结束返回 null */
+/** 依据棋子数判定胜负：黑多黑胜、白多白胜、相等和棋（是否终局由调用方判断） */
 export function decideWinner(board: Board): Winner {
   const { black, white } = countStones(board);
   if (black > white) return 'black';
@@ -258,7 +258,15 @@ export function applyMoveToState(
   if (state.players[player] !== playerId) {
     return { ok: false, status: 409, error: 'not your turn' };
   }
-  if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
+  // 整数检查必须在数组下标访问之前：board[3.5] 为 undefined，再取列会抛 TypeError
+  if (
+    !Number.isInteger(row) ||
+    !Number.isInteger(col) ||
+    row < 0 ||
+    row >= BOARD_SIZE ||
+    col < 0 ||
+    col >= BOARD_SIZE
+  ) {
     return { ok: false, status: 400, error: 'invalid move' };
   }
   if (!isValidMove(state.board, row, col, player)) {
@@ -294,6 +302,15 @@ export function applyMoveToState(
       updatedAt: now,
     },
   };
+}
+
+/**
+ * 转为可下发给任意访客（含观战者）的公开状态：
+ * playerId 兼作落子凭证，绝不能经任何 API 响应外泄，
+ * 否则拿到房间码的人即可冒充对局双方。内部校验仍用原始 state。
+ */
+export function toPublicState(state: GameState): GameState {
+  return { ...state, players: { black: null, white: null } };
 }
 
 /** 再来一局：保留房间与玩家，重置棋盘与对局状态 */
