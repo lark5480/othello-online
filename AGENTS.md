@@ -39,7 +39,7 @@ edge-functions/lib/        router.ts（镜像文件路由的最小路由器，�
 server/mockApi.ts           Vite 中间件，本地免 EdgeOne 验证（复用 gameLogic + 内存 Map 当 KV）
 e2e/                        Playwright 双窗口冒烟（room.spec.ts）
 scripts/                    类型剥离自测脚本
-docs/                       需求PRD.md、部署指南.md、AI对战模式.md、竞品对比与优化分析.md
+docs/                       prd.md、deployment.md、ai-mode.md、competitive-analysis.md
 edgeone.json                SPA fallback 配置
 ```
 
