@@ -1,6 +1,6 @@
 # 黑白棋（Othello）在线对战游戏 — 产品需求文档（PRD）
 
-> 注：本文档撰写时的部署平台名为 **EdgeOne Pages**，该产品已于 2026-06 品牌升级为 **EdgeOne Makers**，功能、架构与部署方式不变。涉及部署操作以《部署指南.md》为准（其 CLI 命令已更新为 `edgeone makers ...`）。
+> 注：本文撰写时平台名为 **EdgeOne Pages**（旧称），已于 2026-06 品牌升级为 **EdgeOne Makers**，功能、架构与部署方式不变。正文除本处说明外统一使用新名，CLI 命令统一为 `edgeone makers ...`；部署细节以《deployment.md》为准。
 
 ---
 
@@ -10,7 +10,7 @@
 |------|------|
 | 产品名称 | Othello Online（黑白棋在线对战） |
 | 产品类型 | 双人回合制策略棋类网页游戏 |
-| 部署平台 | 腾讯云 EdgeOne Pages |
+| 部署平台 | 腾讯云 EdgeOne Makers |
 | 目标 | 两人通过房间码在线对战，无需注册，即开即玩 |
 
 ---
@@ -70,7 +70,7 @@
 
 共 **3 个页面**，保持极简。
 
-> ⚠️ `/room/:roomId` 是前端路由（SPA）。EdgeOne Pages 不会自动把未知路径回退到 `index.html`，**直接刷新或深链会 404**。必须配置 SPA fallback（见 10.4）。
+> ⚠️ `/room/:roomId` 是前端路由（SPA）。EdgeOne Makers 不会自动把未知路径回退到 `index.html`，**直接刷新或深链会 404**。必须配置 SPA fallback（见 10.4）。
 
 ---
 
@@ -80,7 +80,7 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
-│              EdgeOne Pages                       │
+│              EdgeOne Makers                      │
 │                                                  │
 │  ┌────────────┐         ┌────────────────────┐  │
 │  │  前端 SPA   │  HTTP   │  Edge Functions    │  │
@@ -102,10 +102,10 @@
 | UI 样式 | Tailwind CSS v4 | 用 `@tailwindcss/vite` 插件，无需 config 文件 |
 | 后端逻辑 | EdgeOne Edge Functions（V8 runtime） | 处理游戏逻辑；KV 仅能在 Edge Functions 中调用 |
 | 数据存储 | EdgeOne KV | 存房间和游戏状态（需控制台申请开通并绑定） |
-| 状态同步 | 轮询（Polling） | 每 2~3 秒 GET 一次最新状态 |
-| 部署 | EdgeOne Pages | 前端 + 函数一体部署 |
+| 状态同步 | 轮询（Polling） | `waiting` 3s / `playing` 2s / `finished` 5s 拉取最新状态；**自己回合不轮询**（`Room.tsx`: `pollEnabled = !myTurn`） |
+| 部署 | EdgeOne Makers | 前端 + 函数一体部署 |
 
-> 关于 Edge Functions vs Node Functions：EdgeOne Pages 提供两种函数。
+> 关于 Edge Functions vs Node Functions：EdgeOne Makers 提供两种函数。
 > - **Edge Functions**（边缘节点，V8 runtime）：超低延迟、有 KV，但**不支持 WebSocket、不支持 npm 包**。
 > - **Node Functions / Cloud Functions**（云服务器，Node.js）：支持 WebSocket、完整 npm，但**无 KV**，需接外部数据库。
 >
@@ -332,7 +332,7 @@ function json(data: unknown, status = 200) {
 
 ---
 
-## 十、部署方案（EdgeOne Pages）
+## 十、部署方案（EdgeOne Makers）
 
 ### 10.1 项目结构
 
@@ -384,13 +384,13 @@ npm install tailwindcss @tailwindcss/vite
 npm install -g edgeone
 
 # 4. 开发调试（前端 + 函数统一在 http://localhost:8088，支持热更新）
-#    本地要用 KV，需先关联项目：edgeone pages link
-edgeone pages dev
+#    本地要用 KV，需先关联项目：edgeone makers link
+edgeone makers dev
 
-# 5. 部署到 EdgeOne Pages（二选一，详见《部署指南.md》）
+# 5. 部署到 EdgeOne Makers（二选一，详见《deployment.md》）
 #    方式 A：GitHub 仓库连接 → 控制台配置构建命令 npm run build / 输出 dist → 自动构建部署
 #    方式 B：CLI 手动部署
-edgeone pages deploy . -n othello-online
+edgeone makers deploy . -n othello-online
 ```
 
 ### 10.3 轮询策略
@@ -404,7 +404,7 @@ edgeone pages deploy . -n othello-online
 
 ### 10.4 SPA fallback（必须配置，否则 /room/:roomId 刷新 404）
 
-EdgeOne Pages 不会自动把未知前端路由回退到 `index.html`，需二选一：
+EdgeOne Makers 不会自动把未知前端路由回退到 `index.html`，需二选一：
 
 **方案 A（推荐）：`edgeone.json` 重写**
 ```json
@@ -436,7 +436,7 @@ EdgeOne Pages 不会自动把未知前端路由回退到 `index.html`，需二�
 
 ## 十二、后续可扩展（P2）
 
-- [x] AI 对战模式（Minimax + 迭代加深，难度分级：简单/中等/困难/大师；引擎 `src/utils/ai.ts`，Web Worker 异步计算 `src/workers/ai.worker.ts`，离线单机，详见《AI对战模式.md》）
+- [x] AI 对战模式（Minimax + 迭代加深，难度分级：简单/中等/困难/大师；引擎 `src/utils/ai.ts`，Web Worker 异步计算 `src/workers/ai.worker.ts`，离线单机，详见《ai-mode.md》）
 - [x] 落子预览（ghost disc + 翻转高亮）：hover 合法格显示半透明己方棋子和将被翻转的棋子脉冲描边
 - [x] 暗色模式：`prefers-color-scheme` 自动切换设计令牌，全部组件通过语义化 CSS 类适配
 - [x] 程序化音效：Web Audio 合成落子/翻转/胜负短音（零音频文件），`othello_sound` 静音开关默认开

@@ -11,6 +11,8 @@
 
 ## 常用命令
 
+> **需要 Node.js ≥ 22.22.2（推荐 24 LTS）。** 测试依赖 `jsdom@30` / `undici@8`，其 `engines` 要求 `^22.22.2 || ^24.15.0 || >=26`；Node 20 跑 `npm test` 会因缺少 `node:webidl` 直接崩溃（`TypeError: webidl.util.markAsUncloneable is not a function`）。CI 已固定 Node 24，`package.json` 亦声明 `engines`。
+
 ```bash
 npm install        # 安装依赖
 npm run dev        # 本地开发（含 mockApi 中间件，见下）

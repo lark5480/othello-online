@@ -1,7 +1,7 @@
 # Othello Online — EdgeOne Makers 部署指南
 
 > 适用：把本项目的 React 前端 + Edge Functions（游戏 API）+ KV（房间状态）零成本部署到腾讯云 EdgeOne Makers。
-> 读者：已读完《需求PRD.md》，准备本地联调并上线。
+> 读者：已读完《prd.md》，准备本地联调并上线。
 
 > ⚠️ **产品更名提醒**：原 **EdgeOne Pages** 已于 2026-06 品牌升级为 **EdgeOne Makers**，功能、架构与部署方式完全不变（仍含 Edge Functions / Cloud Functions / KV）。下文 CLI 命令已更新为 `edgeone makers ...`；旧的 `edgeone pages ...` 在过渡期内通常仍可兼容，建议直接用新命令。
 
@@ -68,6 +68,17 @@ npm install -g edgeone
 ---
 
 ## 1. 本地开发环境
+
+### 1.0 前置：Node 版本要求
+
+**需要 Node.js ≥ 22.22.2（推荐 24 LTS）。**
+
+测试依赖 `jsdom@30` / `undici@8`，二者 `engines` 要求 `^22.22.2 || ^24.15.0 || >=26`。在 Node 20 上执行 `npm test` 会因缺少 `node:webidl` 直接崩溃：
+`TypeError: webidl.util.markAsUncloneable is not a function`。CI（`.github/workflows/ci.yml`）已固定为 Node 24，`package.json` 亦声明了 `engines`。
+
+```bash
+node -v   # v22.22.2+ 或 v24.15.0+ 均可
+```
 
 ### 1.1 安装 EdgeOne CLI
 

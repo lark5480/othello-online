@@ -75,7 +75,7 @@ export const LOCAL_PLAYER_ID = 'local-player';  // 本地对局中玩家的固�
 ## 4. 前端交互流程
 
 1. 首页点「人机对战」→ 路由 `/ai`。
-2. 设置阶段：选难度（简单/中等/困难）+ 执子（黑先手 / 白后手）→ 开始对局。
+2. 设置阶段：选难度（简单/中等/困难/大师）+ 执子（黑先手 / 白后手）→ 开始对局。
 3. 对局阶段：
    - 玩家回合：`Board` 可点击，落子后 `applyMoveToState` 切换回合。
    - AI 回合：`useEffect` 侦测到 `currentTurn === aiColor` → 显示「AI 思考中…」→ 延迟 450–800ms 后通过 **Web Worker**（`src/workers/ai.worker.ts`）异步调用 `chooseAIMove`，计算完成后 `applyMoveToState` 更新状态。主线程不阻塞，ghost 预览和动画全程流畅。每次请求带递增 id，回调只认最新请求——中途「新对局/重新设置」后，旧对局的计算结果会被直接丢弃，不会写进新棋盘。
