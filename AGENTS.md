@@ -7,7 +7,7 @@
 - 前端：React 18 + Vite 6 + TypeScript + Tailwind CSS v4（CSS-first，配置靠 `src/index.css` 的 `:root` 设计令牌，无 `tailwind.config.js`）。
 - 后端：Edge Functions（V8 runtime）+ KV 存储；前端用轮询（`usePolling`）同步状态。
 - 测试：Vitest（`npm test`，jsdom + jest-dom，setup 在 `src/test/setup.ts`）+ Playwright 双窗口 E2E（`npm run test:e2e`）。
-- 部署：EdgeOne Makers，构建 `npm run build` → 产物 `dist/`；支持 GitHub 自动部署或 `edgeone pages deploy`。CI：`.github/workflows/ci.yml`（typecheck + 单测 + E2E）。
+- 部署：EdgeOne Makers，构建 `npm run build` → 产物 `dist/`；支持 GitHub 自动部署或 `edgeone makers deploy`。CI：`.github/workflows/ci.yml`（typecheck + 单测 + E2E）。
 
 ## 常用命令
 
@@ -66,5 +66,7 @@ edgeone.json                SPA fallback 配置
 - 改完跑 `npm run typecheck` 与 `npm test`（含核心算法 + Edge Functions 全流程测试 + 组件/页面/hook 测试）。
 - 涉及前端交互（Board/Room/AIGame）改动：确认相关组件测试同步更新，必要时跑 `npm run test:e2e` 双窗口冒烟。
 - 涉及提示/棋盘视觉：确认"关提示仍可落子"、最后落子标记（青色 `--last-move`）不与提示点（琥珀 `--hint`）混淆。
-- 部署相关改动：提醒用户用 `edgeone pages dev`(8088) 或 `edgeone pages deploy` 在真实环境验证 KV 与 fallback（本环境无法联网验证）。
+- 部署相关改动：提醒用户用 `edgeone makers dev`(8088) 或 `edgeone makers deploy` 在真实环境验证 KV 与 fallback（本环境无法联网验证）。
 - 文档同步：改完代码后检查 `docs/`、`README.md`、`AGENTS.md` 是否有过时描述（文件/命令/接口/数据），同步更新或删除无效内容。
+- **外部事实必须核验后入档**：写进 `docs/`、`README.md` 的任何外部仓库、版本号、数据，引用前须先核验其存在性与当前状态——首选 `gh api repos/<owner>/<repo>` 查存续与 `isFork`/`pushedAt`，读其 `package.json`/README 核验技术栈；无 `gh` 时用 GitHub MCP 或 web 检索代替。**曾因只检索未核验，把不存在的 `Captnjo/reversi` 写入竞品文档并引用 4 次。**
+- **调研先发现、后核验**：两步不可合并——语义检索只负责扩大候选集，核验负责剔除不存在 / 已归档 / fork 的项。调研方法与通道选型见 `docs/competitive-analysis.md` 文末附录。

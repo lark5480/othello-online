@@ -1,5 +1,5 @@
 /**
- * 镜像 EdgeOne Pages 文件路由的最小路由器（路径匹配 + params 提取 + 方法分派）。
+ * 镜像 EdgeOne Makers 文件路由的最小路由器（路径匹配 + params 提取 + 方法分派）。
  *
  * 为什么存在：Edge Functions 的真实入口由平台的文件路由执行
  * （目录结构即路由、动态段 [xxx] 进 context.params）。本地测试若直接调用

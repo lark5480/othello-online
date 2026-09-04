@@ -1,7 +1,7 @@
 # 黑白棋在线对战（othello-online）· 竞品生态简报
 
 > 复核日期：2026-09-03（初版 2026-09-01，本次按 GitHub API 全量复核并重写结论）
-> 复核方式：GitHub GraphQL API 核验仓库存续 / 星标 / 活跃度 → 读取仓库 `package.json` 与 README 核验技术栈 → Exa 检索补齐生态
+> 复核方式：GitHub GraphQL API 核验仓库存续 / 星标 / 活跃度 → 读取仓库 `package.json` 与 README 核验技术栈 → Exa 检索补齐生态（通道选型依据见[文末附录](#appendix)）
 > 适用范围：本仓库是**纯前端 + 自研多等级 AI，无引擎进程、无常驻服务端**。非同栈项目（Flutter / C++ / Python+pygame）不作为对标对象，仅列作体验参照。
 > 数据口径：星标与最后提交时间均为 2026-09-03 实测值，会随时间漂移，引用前请自行复核。
 
@@ -172,4 +172,42 @@ Egaroucid 作者实测过 NNUE（将棋/国象的小网络评估）在黑白棋�
 但初版"整体优于绝大多数竞品、工程规范优于平均"的自评**不成立**：其依据是 12 个合计 21★、多数已停更的僵尸项目（其中一个根本不存在）。按实测数据，本项目在**工程规范完备度（无 lint 链）、社区资产（无 LICENSE/badges）、功能完备度（无计时/撤销/持久化）**三个维度上，被 0★ 但活跃维护的 `cozyGarage/Othello` 明确反超；AI 方面 master 档与其 hard 档架构同构，谈不上"中上水平"的领先。
 
 **定位建议**：把本项目定位为"Serverless 联机架构 + 安全细节的样板工程"，而非"功能与工程完备度全面领先的产品"。前者的差异化是真的，后者经不起核验。
+
+---
+
+<a id="appendix"></a>
+
+## 附录：调研通道选型（下次复核本文档前先读本节）
+
+> 记录于 2026-09-03。**工具可用性随环境变化，引用前请先探测本环境有哪些通道，不要硬编码工具名。**
+
+### A1 先做能力探测
+
+```bash
+gh auth status    # 有输出且已认证 → 优先用 gh（能力最全、返回最省、支持 GraphQL 批量查）
+                  # 未认证 / 命令不存在 → 回退 GitHub MCP → 再回退原生 web search
+```
+
+云端沙箱（如 Codex 容器）通常**没有 `gh` 认证**，直接执行 `gh api` 会失败，须走回退路径。
+
+### A2 按阶段选通道（两阶段不可合并）
+
+| 阶段 | 首选 | 备选 | 说明 |
+|------|------|------|------|
+| **发现**（扩大候选集） | exa / 原生 web search | — | 语义召回，能发现名字里不含目标关键词的项目（如 `board-game-engine`、`boardgame.io` 均无 othello/reversi 字样）。`gh` 只做结构化字段匹配，无法表达"找可复用的黑白棋库"这类意图 | **⚠️ 语义检索本身会误报**：本次 Captnjo/reversi 即经 exa 捞回、看似存在实则用户名下无此仓库，**发现阶段的任何候选都必须进入核验阶段确认**。|
+| **核验**（存在性 / 状态） | `gh api`（GraphQL 批量取 `stargazers` / `pushedAt` / `isArchived` / `isFork` / `primaryLanguage`） | GitHub MCP | **唯一可信事实源**。本次据此剔除：不存在的 `Captnjo/reversi`、`isFork=true` 的 `d3r3k-d4nk`、主语言实为 C++ 的 `rytlebsk` |
+| **精读**（内部实现） | `gh api repos/<o>/<r>/contents/package.json` + base64 解码头 N 行读 README | deepwiki（**仅已索引仓库**） | deepwiki 对冷门仓库返回 *Repository not found, visit deepwiki.com to index it*，本次 2/2 未命中 | 如需精读冷门仓库，请先到 deepwiki.com 触发索引（小时级），不要期望即时可用 |
+
+### A3 本次实测成功率（仅供参照，非永久结论）
+
+| 通道 | 调用次数 | 成功 | 备注 |
+|------|---------|------|------|
+| `gh` CLI | ~10 | 100% | 含 GraphQL 批量查 12 仓库、读 2 份 `package.json`、读 README、列出用户全部仓库、`gh run watch` 盯 CI |
+| exa-search | 2 | 100% | 捞到 6 个可复用轮子与 Egaroucid/Edax 技术细节；部分内容源自非 GitHub 站点（如 Egaroucid 官网技术页），`gh` 够不到 |
+| GitHub MCP | 4 | **0** | 全部 `fetch failed`（MCP server 进程网络问题，不代表永久不可用） |
+| deepwiki | 2 | **0** | 全部"未索引"，与其最优适用场景（精读知名大仓库）不匹配 |
+
+### A4 省 token 的真正杠杆
+
+不是"用不用 MCP"，而是**控制返回量**：`gh api graphql` 精确取字段（12 个仓库仅数百 token），远优于语义搜索返回大段网页摘要（数千 token 且含 HTML 噪声）；读文件用 `--jq '.content'` 配 base64 解码并截断行数。
 
