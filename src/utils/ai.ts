@@ -3,7 +3,8 @@
  * 纯 TS/JS、零依赖，可在浏览器 / Node / Edge Functions(V8) 下直接运行，并复用 gameLogic 的纯规则。
  *
  * 设计要点：
- * - 难度分级：easy(随机) / medium(2 层 Minimax) / hard(4 层 alpha-beta + 落子顺序剪枝，残局精确搜索)。
+ * - 难度分级：easy(随机) / medium(2 层 Minimax) / hard(4 层 alpha-beta + 落子顺序剪枝，800ms 时间预算)
+ *   / master(6 层迭代加深 + 落子顺序剪枝，1500ms 时间预算)，hard/master 残局均精确搜索到底。
  * - 评估函数：位置权重矩阵(角最高、X/C 位为负) + 行动力(mobility) 差，残局叠加子数差。
  * - 所有搜索均为纯函数、无全局副作用；随机源(仅 easy)可注入，便于单测确定性。
  * - 回合管理 / 跳过 / 胜负判定完全复用 gameLogic.applyMoveToState，保证与联网模式规则一致。

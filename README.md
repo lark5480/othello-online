@@ -25,7 +25,7 @@
 | 后端 | EdgeOne Makers Edge Functions（V8）、KV 存储 |
 | 同步 | 前端轮询（`usePolling`）+ `currentTurn`/`updatedAt` 防并发与陈旧数据 |
 | 测试 | Vitest（单元/组件）+ Playwright（双窗口 E2E），GitHub Actions CI |
-| 部署 | EdgeOne Makers（GitHub 自动部署 / `edgeone pages deploy`） |
+| 部署 | EdgeOne Makers（GitHub 自动部署 / `edgeone makers deploy`） |
 
 ## 快速开始（本地）
 
@@ -51,10 +51,10 @@ npm run preview   # 本地预览构建产物
 部署到 EdgeOne Makers：
 
 1. 在 EdgeOne 控制台创建 KV 命名空间，绑定项目变量（如 `OTHELLO_KV`）。
-2. 关联 GitHub 仓库自动部署，或执行 `edgeone pages deploy`（构建 `npm run build`、输出 `dist`）。
+2. 关联 GitHub 仓库自动部署，或执行 `edgeone makers deploy`（构建 `npm run build`、输出 `dist`）。
 3. SPA 路由已在 `edgeone.json` 配置 fallback（`/room/:roomId` 刷新不 404）。
 
-> 详细部署步骤与架构约束见 [`docs/部署指南.md`](docs/部署指南.md)；完整产品需求见 [`docs/需求PRD.md`](docs/需求PRD.md)。
+> 详细部署步骤与架构约束见 [`docs/deployment.md`](docs/deployment.md)；完整产品需求见 [`docs/prd.md`](docs/prd.md)。
 
 ## 项目结构
 
@@ -73,7 +73,7 @@ server/mockApi.ts      本地免 EdgeOne 验证的 Vite 中间件（内存 KV，
 e2e/                   Playwright 双窗口冒烟测试（room.spec.ts）
 scripts/               类型剥离自测脚本
 .github/workflows/     CI（typecheck + 单测 + E2E）
-docs/                  需求PRD、部署指南、AI 模式、竞品分析
+docs/                  prd.md、deployment.md、ai-mode.md、competitive-analysis.md
 edgeone.json           SPA fallback 配置
 ```
 
