@@ -138,7 +138,12 @@ function minimax(
   alpha: number,
   beta: number
 ): number {
-  if (depth <= 0) return evaluate(board, me);
+  if (depth <= 0) {
+    if (!hasAnyValidMove(board, toMove) && !hasAnyValidMove(board, opponentOf(toMove))) {
+      return terminalScore(board, me);
+    }
+    return evaluate(board, me);
+  }
 
   const moves = orderedMoves(board, toMove);
   if (moves.length === 0) {
@@ -146,7 +151,7 @@ function minimax(
     if (!hasAnyValidMove(board, opponentOf(toMove))) {
       return terminalScore(board, me);
     }
-    return minimax(board, me, opponentOf(toMove), depth - 1, alpha, beta);
+    return minimax(board, me, opponentOf(toMove), depth, alpha, beta);
   }
 
   const opp = opponentOf(toMove);

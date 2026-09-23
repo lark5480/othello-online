@@ -83,7 +83,7 @@ export default function AIGame() {
   // 棋盘音效：落子自动发声，终局按视角播放胜/负/和
   useBoardSound({
     state,
-    resolveOutcome: (s) => (s.winner === myColor ? 'win' : s.winner === null ? 'draw' : 'loss'),
+    resolveOutcome: (s) => (s.winner === myColor ? 'win' : s.winner === 'draw' ? 'draw' : 'loss'),
   });
 
   // 落子提示开关（AI 模式默认开启，按设备+模式持久化）
@@ -103,6 +103,7 @@ export default function AIGame() {
   // 开始 / 重开：用当前设置重建本地对局状态
   const startGame = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    requestIdRef.current++;
     thinkingRef.current = false;
     setThinking(false);
     recordedRef.current = false;
@@ -124,6 +125,7 @@ export default function AIGame() {
     // 模拟思考节奏，体验更自然；计算本身是同步的，延迟后再执行以避免卡顿观感
     const delay = 450 + Math.random() * 350;
     const currentRequestId = ++requestIdRef.current;
+    let handler: ((e: MessageEvent<{ id: number; move: Move | null }>) => void) | null = null;
 
     timerRef.current = setTimeout(() => {
       if (state.status !== 'playing' || state.currentTurn !== aiColor) return;
@@ -141,8 +143,12 @@ export default function AIGame() {
       };
 
       if (worker) {
-        const handler = (e: MessageEvent<{ id: number; move: Move | null }>) => apply(e.data.move);
-        worker.addEventListener('message', handler, { once: true });
+        handler = (e) => {
+          if (e.data.id !== currentRequestId) return;
+          worker.removeEventListener('message', handler!);
+          apply(e.data.move);
+        };
+        worker.addEventListener('message', handler);
         worker.postMessage({
           id: currentRequestId,
           board: state.board,
@@ -157,6 +163,8 @@ export default function AIGame() {
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (handler) worker?.removeEventListener('message', handler);
+      if (requestIdRef.current === currentRequestId) requestIdRef.current++;
       thinkingRef.current = false;
       setThinking(false);
     };
@@ -180,7 +188,7 @@ export default function AIGame() {
       recordedRef.current = true;
       const { black, white } = countStones(state.board);
       const outcome: Outcome =
-        state.winner === myColor ? 'win' : state.winner === null ? 'draw' : 'loss';
+        state.winner === myColor ? 'win' : state.winner === 'draw' ? 'draw' : 'loss';
       setStats(recordResult(difficulty, outcome, Math.abs(black - white)));
     } else if (state?.status !== 'finished') {
       recordedRef.current = false;
@@ -373,6 +381,7 @@ export default function AIGame() {
             type="button"
             onClick={() => {
               if (timerRef.current) clearTimeout(timerRef.current);
+              requestIdRef.current++;
               thinkingRef.current = false;
               setThinking(false);
               setStarted(false);
