@@ -33,7 +33,7 @@ src/
   components/   Board / Cell / GameInfo / MoveHistory / StatsPanel / ThemeToggle / icons
   hooks/        usePolling、useBoardSound
   workers/      ai.worker.ts（AI 计算放 Web Worker，主线程不阻塞）
-  utils/        gameLogic.ts（纯规则引擎，前后端共用）、ai.ts（AI 对手引擎：Minimax+剪枝、难度分级）、api.ts、player.ts、roomCode.ts（房间码生成/校验，前后端共用）、hints.ts（提示开关持久化，按模式分 key）、sound.ts / stats.ts / theme.ts
+  utils/        gameLogic.ts（纯规则引擎，前后端共用）、ai.ts（AI 对手引擎：Minimax+剪枝、难度分级）、api.ts、coords.ts（棋盘坐标→走子标签）、player.ts、roomCode.ts（房间码生成/校验，前后端共用）、hints.ts（提示开关持久化，按模式分 key）、sound.ts / stats.ts / theme.ts
   test/         setup.ts（Vitest：jsdom + jest-dom）
   index.css     设计令牌 + 棋盘/棋子/提示样式
 edge-functions/api/room/   服务端：create/join/[roomId]/{state,move,restart}

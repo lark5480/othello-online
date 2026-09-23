@@ -63,7 +63,7 @@ npm install -g edgeone
 
 > 控制台直链里的 `edgeone/pages` 路径在产品更名后通常会自动跳转到 Makers 控制台，属正常现象，无需担心。
 
-> 费用：EdgeOne Makers 公测期有免费额度；商业化后个人版约 ¥9.9/月（含流量+请求）。KV 在免费/低用量下近乎零成本，适合个人小项目。
+> 费用：EdgeOne Makers 免费版永久提供（官方定价页，2026-09 核验）；付费版尚未公布定价，以官网为准。KV 在低用量下近乎零成本，适合个人小项目。
 
 ---
 
@@ -178,24 +178,7 @@ return new Response(JSON.stringify(state), {
 
 `/room/:roomId` 是前端路由。EdgeOne Makers 不会自动回退到 `index.html`，直接刷新或分享深链会 404。二选一：
 
-### 方案 A（推荐，最稳）：catch-all 函数
-
-新建 `edge-functions/[[default]].ts`：
-
-```ts
-export function onRequest(context: EventContext) {
-  // 已匹配 /api/* 的请求不会走到这里（具体路由优先）。
-  // 仅对没有静态文件、也没有 api 文件的路径返回首页 HTML。
-  const html = `<!doctype html>...`; // 实际部署时返回构建产物 dist/index.html 内容
-  return new Response(html, {
-    headers: { 'Content-Type': 'text/html; charset=UTF-8' },
-  });
-}
-```
-
-> 注意：需要读取 `dist/index.html` 内容返回。可在构建后由函数读取（或用方案 B）。
-
-### 方案 B：edgeone.json 重写
+### 方案 A（推荐，本项目实际采用）：edgeone.json 重写
 
 在项目根 `edgeone.json` 配置重写规则（字段以官方最新文档为准）：
 
@@ -207,7 +190,24 @@ export function onRequest(context: EventContext) {
 }
 ```
 
-> 此写法对所有未命中路径回退到 `index.html`；静态资源（`/assets/*.js` 等）由平台优先以静态文件返回，不受影响。若你的 edgeone.json 字段与控制台/官方文档不一致，以官方为准，或优先用方案 A。
+> 此写法对所有未命中路径回退到 `index.html`；静态资源（`/assets/*.js` 等）由平台优先以静态文件返回，不受影响。本项目 `edgeone.json` 已加 accept 头条件（仅 HTML 请求回退，见 PRD 10.4）。若字段与控制台/官方文档不一致，以官方为准，或改用方案 B。
+
+### 方案 B：catch-all 函数
+
+新建 `edge-functions/[[default]].ts`：
+
+```ts
+export function onRequest(context: EventContext) {
+  // 已匹配 /api/* 的请求不会走到这里（具体路由优先）。
+  // 仅对没有静态文件、也没有 api 文件的路径返回首页 HTML。
+  const html = `<!doctype html>...`; // 实际部署时返回构建产物 dist/index.html 内容
+  return new Response(html, {
+    headers: { 'Content-Type': 'text/html' },
+  });
+}
+```
+
+> 注意：需要读取 `dist/index.html` 内容返回。可在构建后由函数读取，或优先用方案 A。
 
 ---
 
@@ -233,7 +233,7 @@ othello-online/
 │   ├── hooks/usePolling.ts / useBoardSound.ts
 │   ├── workers/ai.worker.ts     # AI 计算放 Web Worker，不阻塞主线程
 │   ├── utils/gameLogic.ts       # 纯 JS 游戏逻辑（前端与函数端共用）
-│   ├── utils/ai.ts / hints.ts / api.ts / player.ts / roomCode.ts / sound.ts / stats.ts / theme.ts
+│   ├── utils/ai.ts / hints.ts / api.ts / coords.ts / player.ts / roomCode.ts / sound.ts / stats.ts / theme.ts
 │   ├── test/setup.ts            # Vitest（jsdom + jest-dom）环境
 │   └── index.css                # 设计令牌（Tailwind v4 CSS-first）
 ├── edge-functions/
