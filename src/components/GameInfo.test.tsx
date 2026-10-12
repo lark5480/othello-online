@@ -13,6 +13,7 @@ function state(over?: Partial<GameState>): GameState {
     players: { black: null, white: null },
     moveCount: 0,
     lastMove: null,
+    moves: [],
     winner: null,
     createdAt: 0,
     updatedAt: 0,

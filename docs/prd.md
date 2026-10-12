@@ -32,7 +32,7 @@
 | G-01 | 棋盘展示 | 8×8 棋盘，显示黑白棋子、可落子提示 | P0 |
 | G-02 | 落子 | 点击合法位置落子（注意 KV 无事务，靠 currentTurn 校验缓解并发，见 5.4） | P0 |
 | G-03 | 翻转动画 | 被夹住的棋子翻转，带翻转动画 | P0 |
-| G-04 | 合法落子提示（可配置） | 可落子位置高亮，联网对战默认关闭，提供「显示落子提示」开关并持久化到 localStorage；未来练习/AI 模式可默认开启 | P0 |
+| G-04 | 合法落子提示（可配置） | 可落子位置高亮，联网对战默认关闭，提供「显示落子提示」开关并持久化到 localStorage；练习/AI 模式默认开启 | P0 |
 | G-05 | 跳过回合 | 无合法落子时自动跳过，提示对方 | P0 |
 | G-06 | 胜负判定 | 双方均无法落子或棋盘满时判定胜负 | P0 |
 | G-07 | 棋子计数 | 实时显示双方棋子数量 | P1 |
@@ -411,13 +411,15 @@ EdgeOne Makers 不会自动把未知前端路由回退到 `index.html`，需二�
 {
   "redirects": [],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html", "has": { "type": "header", "key": "accept", "value": "text/html" } }
+    { "source": "/*", "destination": "/index.html" }
   ]
 }
 ```
-（仅对 HTML 请求回退；静态资源如 `/assets/*.js` 不受影响）
+平台会将这一精确形式识别为 SPA fallback：请求**先匹配项目中的已有路由（含静态资源与函数）**，仅在未命中任何其他路由时才回退到 `/index.html`，交由前端路由处理。因此 `/assets/*.js`、`/api/*` 不会被误回退成 HTML，无需再靠请求头条件来区分。
 
-**方案 B：catch-all 函数** `edge-functions/[[default]].ts` 返回 `index.html` 内容（注意与 `/api/*` 路由不冲突）。
+> **变更说明**：本节此前推荐带 `has: { "key": "accept", "value": "text/html" }` 条件的写法（`/(.*)` + `has`）。该写法不在 `edgeone.json` 的文档字段面内，且 `/(.*)` 不在平台支持的 `source` 匹配形式内——一旦 `has` 被平台忽略，会退化成无条件的 `/(.*) → /index.html`，把静态资源也重写成 HTML。2026-10-12 经技术侧论证后修正为上述官方形式，依据见 `docs/architecture/adr/ADR-0006-spa-fallback-official-form.md`。**请勿再加回 `has` 条件。**
+
+**方案 B（备用）：catch-all 函数** `edge-functions/[[default]].ts` 返回 `index.html` 内容（注意与 `/api/*` 路由不冲突）。方案 A 已具备「静态资源与函数优先匹配」语义，正常情况下无需 B；仅当 A 在真实环境被证伪（深链仍 404）时，才改用 B 兜底（参见 ADR-0006 的「替代方案 C」与「失效条件」）。
 
 ---
 
@@ -462,4 +464,4 @@ EdgeOne Makers 不会自动把未知前端路由回退到 `index.html`，需二�
 6. API 路由改为文件路由映射，7.1 落子逻辑改为真实 Edge Functions 形态
 7. R-01 房间码冲突重试、R-05 重连边界、G-02 并发落子风险、Tailwind v4 安装方式等补强
 
-> 修正后的 PRD 可直接作为开发依据。需要我接下来帮你生成具体的代码吗？可以从棋盘组件或 Edge Functions 开始。
+> 修正后的 PRD 可直接作为开发依据。

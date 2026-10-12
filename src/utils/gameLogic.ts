@@ -24,6 +24,15 @@ export interface Move {
   col: number;
 }
 
+/** 带执子方的落子记录：走子记录与「回顾」需要知道每手是谁走的。
+ * 旧实现靠 state.board[lastMove.row][lastMove.col] === BLACK 反推执子方，
+ * 但该格在后续回合可能被翻转覆盖，反推并不可靠，故在持久化时一并记下。 */
+export interface MoveWithPlayer {
+  row: number;
+  col: number;
+  player: Player;
+}
+
 export interface GameState {
   roomId: string;
   status: RoomStatus;
@@ -35,6 +44,9 @@ export interface GameState {
   };
   moveCount: number;
   lastMove: Move | null;
+  /** 完整棋谱（含执子方），按落子先后顺序。
+   * 必须持久化：否则刷新后客户端只能靠 lastMove 补回最后一手，走子记录与回顾功能会丢历史。 */
+  moves: MoveWithPlayer[];
   winner: Winner;
   createdAt: number;
   updatedAt: number;
@@ -219,6 +231,7 @@ export function createInitialState(
     players: { black: blackPlayerId, white: null },
     moveCount: 0,
     lastMove: null,
+    moves: [],
     winner: null,
     createdAt: now,
     updatedAt: now,
@@ -299,6 +312,7 @@ export function applyMoveToState(
       winner,
       moveCount: state.moveCount + 1,
       lastMove: { row, col },
+      moves: [...state.moves, { row, col, player }],
       updatedAt: now,
     },
   };
@@ -322,6 +336,8 @@ export function restartState(state: GameState, now: number = Date.now()): GameSt
     currentTurn: 'black',
     moveCount: 0,
     lastMove: null,
+    // 必须清空棋谱：漏掉会让重开后的走子记录残留上一局
+    moves: [],
     winner: null,
     updatedAt: now,
   };

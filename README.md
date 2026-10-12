@@ -39,7 +39,7 @@ npm run dev
 打开两个浏览器窗口（或两台设备），一个创建房间、一个用房间码加入即可对弈。
 本地验证无需配置 EdgeOne / KV——`server/mockApi.ts` 会在 `npm run dev` 时自动挂载一个内存版接口，端点形状与生产一致。
 
-想挑战电脑？打开 `/ai` 即可与 AI 对战（简单 / 中等 / 困难），同样是纯本地、无需任何后端配置。
+想挑战电脑？打开 `/ai` 即可与 AI 对战（简单 / 中等 / 困难 / 大师），同样是纯本地、无需任何后端配置。
 
 ## 构建与部署
 
@@ -65,7 +65,7 @@ src/                   前端源码
 ├─ hooks/              usePolling（状态轮询）、useBoardSound（音效）
 ├─ workers/            ai.worker.ts（AI 异步计算，不阻塞主线程）
 ├─ utils/              gameLogic.ts（规则引擎）、ai.ts（AI 引擎）、hints.ts（提示开关）、
-│                      api.ts / player.ts / roomCode.ts / sound.ts / stats.ts / theme.ts
+│                      api.ts / coords.ts / player.ts / roomCode.ts / sound.ts / stats.ts / theme.ts
 ├─ test/               setup.ts（Vitest：jsdom + jest-dom）
 └─ index.css           设计令牌 + 棋盘/棋子/提示样式
 edge-functions/        Edge Functions：create / join / [roomId]/{state, move, restart} + lib（router/kv/types）

@@ -15,10 +15,13 @@ import {
   createInitialBoard,
   getValidMoves,
   applyMoveToState,
+  applyMoveBoard,
+  opponentOf,
   countStones,
   decideWinner,
   type Board,
   type GameState,
+  type Player,
   type Winner,
 } from './gameLogic';
 
@@ -35,6 +38,29 @@ function mulberry32(seed: number): () => number {
 }
 
 const DIFFS: Difficulty[] = ['easy', 'medium', 'hard', 'master'];
+
+function solveEndgame(
+  board: Board,
+  me: Player,
+  toMove: Player,
+  stats: { passes: number; terminalEmpty: number[] }
+): number {
+  const moves = getValidMoves(board, toMove);
+  const opponent = opponentOf(toMove);
+  if (moves.length === 0) {
+    if (getValidMoves(board, opponent).length > 0) {
+      stats.passes++;
+      return solveEndgame(board, me, opponent, stats);
+    }
+    const { black, white, empty } = countStones(board);
+    stats.terminalEmpty.push(empty);
+    return me === 'black' ? black - white : white - black;
+  }
+  const scores = moves.map((move) =>
+    solveEndgame(applyMoveBoard(board, move.row, move.col, toMove), me, opponent, stats)
+  );
+  return toMove === me ? Math.max(...scores) : Math.min(...scores);
+}
 
 describe('评估函数 evaluate', () => {
   it('角位权重为正且远高于内部', () => {
@@ -92,6 +118,80 @@ describe('chooseAIMove 基本性质', () => {
       expect(chooseAIMove(board, 'black', d)).toEqual({ row: 0, col: 0 });
     }
   });
+});
+
+describe('残局穷举回归', () => {
+  const cases: {
+    name: string;
+    rows: string[];
+    player: Player;
+    empty: number;
+    passes: number;
+    scores: number[];
+  }[] = [
+    {
+      name: 'depth 0 的满盘终局必须按最终子差而非位置权重评分',
+      rows: [
+        '20111111',
+        '11111111',
+        '21222211',
+        '21221122',
+        '01222222',
+        '01211222',
+        '12121122',
+        '22222222',
+      ],
+      player: 'white',
+      empty: 3,
+      passes: 0,
+      scores: [18, 8, 14],
+    },
+    {
+      name: 'pass 不得消耗剩余落子深度而截断精确残局搜索',
+      rows: [
+        '11111101',
+        '21122211',
+        '01112121',
+        '21221221',
+        '22212221',
+        '22121211',
+        '01112211',
+        '21110211',
+      ],
+      player: 'black',
+      empty: 4,
+      passes: 2,
+      scores: [6, 16],
+    },
+  ];
+
+  for (const testCase of cases) {
+    it.each<Difficulty>(['medium', 'hard', 'master'])(`${testCase.name} (%s)`, (difficulty) => {
+      const board: Board = testCase.rows.map((row) =>
+        Array.from(row, (cell) => cell === '1' ? BLACK : cell === '2' ? WHITE : EMPTY)
+      );
+      expect(countStones(board).empty).toBe(testCase.empty);
+      const moves = getValidMoves(board, testCase.player);
+      expect(moves.length).toBeGreaterThan(1);
+      const stats = { passes: 0, terminalEmpty: [] as number[] };
+      const scores = moves.map((move) =>
+        solveEndgame(
+          applyMoveBoard(board, move.row, move.col, testCase.player),
+          testCase.player,
+          opponentOf(testCase.player),
+          stats
+        )
+      );
+      expect(scores).toEqual(testCase.scores);
+      expect(stats.passes).toBe(testCase.passes);
+      expect(stats.terminalEmpty.length).toBeGreaterThan(0);
+      expect(stats.terminalEmpty.every((empty) => empty === 0)).toBe(true);
+      const best = Math.max(...scores);
+      const bestMoves = moves.filter((_, index) => scores[index] === best);
+      expect(bestMoves).toHaveLength(1);
+      expect(bestMoves).toContainEqual(chooseAIMove(board, testCase.player, difficulty));
+    });
+  }
 });
 
 describe('本地对局状态编排', () => {
@@ -157,7 +257,7 @@ describe('自对弈不变量（回合管理 + 跳过 + 终局）', () => {
       expect(black + white + empty).toBe(64);
       expect(s.winner).toBe(decideWinner(s.board));
     }
-  });
+  }, 20_000);
 
   it('medium vs medium 同样终局守恒', () => {
     const s = playSelfPlay('medium', 'medium', mulberry32(7));

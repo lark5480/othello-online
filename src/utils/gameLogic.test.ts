@@ -135,6 +135,126 @@ describe('joinState / restartState', () => {
   });
 });
 
+describe('走子棋谱 moves[]（BUG-01 回归）', () => {
+  it('连续落子 3 手后 moves 长度与 moveCount 一致，且每项 {row,col,player} 正确', () => {
+    let s = joinState(createInitialState('TEST01', 'pb'), 'pw');
+    // 开局黑先手，(2,3) / (2,4) / (2,5) 依次为黑、白、黑（需按实际合法点落子）
+    const seq: Array<[number, number]> = [
+      [2, 3],
+      [2, 4],
+      [2, 5],
+    ];
+    for (const [row, col] of seq) {
+      const playerId = s.players[s.currentTurn]!;
+      const res = applyMoveToState(s, playerId, row, col);
+      expect(res.ok).toBe(true);
+      if (res.ok) s = res.state;
+    }
+    expect(s.moves).toHaveLength(3);
+    expect(s.moveCount).toBe(3);
+    expect(s.moves).toEqual([
+      { row: 2, col: 3, player: 'black' },
+      { row: 2, col: 4, player: 'white' },
+      { row: 2, col: 5, player: 'black' },
+    ]);
+    // 每项 player 必须等于「落子当时该方确实是当前回合」，而不是从棋盘反推
+    expect(s.moves.map((m) => m.player)).toEqual(['black', 'white', 'black']);
+  });
+
+  it('初始 / 加入后 moves 为空数组', () => {
+    const fresh = createInitialState('TEST01', 'pb');
+    expect(fresh.moves).toEqual([]);
+    expect(joinState(fresh, 'pw').moves).toEqual([]);
+  });
+
+  it('restartState 清空棋谱：moves.length===0 且 moveCount===0', () => {
+    let s = joinState(createInitialState('TEST01', 'pb'), 'pw');
+    for (const [row, col] of [
+      [2, 3],
+      [2, 4],
+    ] as const) {
+      const res = applyMoveToState(s, s.players[s.currentTurn]!, row, col);
+      if (res.ok) s = res.state;
+    }
+    expect(s.moves).toHaveLength(2);
+    const r = restartState(s);
+    expect(r.moves).toEqual([]); // 漏清空会让重开后残留上一局记录
+    expect(r.moves).toHaveLength(0);
+    expect(r.moveCount).toBe(0);
+    expect(r.lastMove).toBeNull();
+  });
+
+  it('toPublicState 保留 moves，但 players 仍为 null/null（安全回归）', () => {
+    let s = joinState(createInitialState('TEST01', 'pb'), 'pw');
+    const res = applyMoveToState(s, 'pb', 2, 3);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    s = res.state;
+    const pub = toPublicState(s);
+    // 棋谱必须下发（客户端刷新后靠它渲染走子记录）
+    expect(pub.moves).toEqual([{ row: 2, col: 3, player: 'black' }]);
+    // 但 playerId 绝不能外泄
+    expect(pub.players).toEqual({ black: null, white: null });
+    expect(JSON.stringify(pub)).not.toContain('pb');
+    expect(JSON.stringify(pub)).not.toContain('pw');
+    // 原对象保持含 id
+    expect(s.players).toEqual({ black: 'pb', white: 'pw' });
+  });
+
+  it('跳过回合时 moveCount 与 moves.length 仍一致，且 player 为实际落子方', () => {
+    // 构造真实跳过局面：白方仅剩一子且无处可下，黑落子后仍轮黑
+    let seed = 20260831;
+    const rng = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    let checked = false;
+    search: for (let game = 0; game < 500 && !checked; game++) {
+      let s = joinState(createInitialState('TEST01', 'pb'), 'pw');
+      let guard = 0;
+      while (s.status === 'playing' && guard < 100) {
+        guard++;
+        const moves = getValidMoves(s.board, s.currentTurn);
+        const pick = moves[Math.floor(rng() * moves.length)];
+        const mover = s.currentTurn;
+        const res = applyMoveToState(s, s.players[mover]!, pick.row, pick.col);
+        if (!res.ok) break;
+        const skipped =
+          res.state.status === 'playing' && res.state.currentTurn === mover;
+        // 不变量：跳过不改变「一手 = moves 增加一条 = moveCount 加一」
+        expect(res.state.moves).toHaveLength(res.state.moveCount);
+        expect(res.state.moves[res.state.moves.length - 1]).toEqual({
+          row: pick.row,
+          col: pick.col,
+          player: mover, // 落子方是「落子当时的 currentTurn」，跳过时也不变
+        });
+        if (skipped) {
+          checked = true;
+          break search;
+        }
+        s = res.state;
+      }
+    }
+    expect(checked).toBe(true);
+  });
+
+  it('整局终局后 moves.length === moveCount（≤60 手）', () => {
+    let s = joinState(createInitialState('TEST01', 'pb'), 'pw');
+    let guard = 0;
+    while (s.status === 'playing' && guard < 100) {
+      guard++;
+      const moves = getValidMoves(s.board, s.currentTurn);
+      const pick = moves[Math.floor(Math.random() * moves.length)];
+      const res = applyMoveToState(s, s.players[s.currentTurn]!, pick.row, pick.col);
+      expect(res.ok).toBe(true);
+      if (res.ok) s = res.state;
+    }
+    expect(s.status).toBe('finished');
+    expect(s.moves).toHaveLength(s.moveCount);
+    expect(s.moves.length).toBeLessThanOrEqual(60);
+  });
+});
+
 describe('胜负判定', () => {
   it('棋子多者获胜，相等为和棋', () => {
     const board = createInitialBoard();

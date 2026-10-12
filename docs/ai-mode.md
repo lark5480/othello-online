@@ -88,10 +88,10 @@ export const LOCAL_PLAYER_ID = 'local-player';  // 本地对局中玩家的固�
 npm install
 npm run dev        # 浏览器开 /ai 即与 AI 对弈，无需后端
 npm run typecheck  # tsc --noEmit，应无错误
-npm test           # vitest：AI 引擎 18 用例 + 规则引擎 / Edge Functions（含路由层）/ mock / 工具层用例，全绿
+npm test           # vitest：AI 引擎 / 规则引擎 / Edge Functions（含路由层）/ mock / 工具层用例全绿
 ```
 
-测试覆盖（`src/utils/ai.test.ts`）：评估函数性质、各难度合法落子、easy 的 rng 可控性、medium/hard 确定性、本地状态编排（先手/跳过/不抢手）、自对弈回合与终局不变量（棋子守恒、胜负一致）、hard 首步与中盘单步均 < 2s、master 在时间预算内完成且返回合法落子、easy 不受迭代加深影响、hard/master 残局精确求解、hard 稳定战胜 easy。
+测试覆盖（`src/utils/ai.test.ts`、`src/pages/AIGame.test.tsx`）：评估函数性质、各难度合法落子、easy 的 rng 可控性、medium/hard 确定性、本地状态编排（先手/跳过/不抢手）、自对弈回合与终局不变量（棋子守恒、胜负一致）、hard 首步与中盘单步均 < 2s、master 在时间预算内完成且返回合法落子、easy 不受迭代加深影响、hard/master 残局精确求解（穷举 oracle 对照）、hard 稳定战胜 easy；`AIGame.test.tsx` 覆盖 Worker 请求隔离（旧响应不落子、重开不串台）与和棋战绩分类。
 
 ## 6. 集成清单（已落地）
 

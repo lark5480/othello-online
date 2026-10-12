@@ -63,7 +63,7 @@ npm install -g edgeone
 
 > 控制台直链里的 `edgeone/pages` 路径在产品更名后通常会自动跳转到 Makers 控制台，属正常现象，无需担心。
 
-> 费用：EdgeOne Makers 公测期有免费额度；商业化后个人版约 ¥9.9/月（含流量+请求）。KV 在免费/低用量下近乎零成本，适合个人小项目。
+> 费用：EdgeOne Makers 免费版永久提供（官方定价页，2026-09 核验）；付费版尚未公布定价，以官网为准。KV 在低用量下近乎零成本，适合个人小项目。
 
 ---
 
@@ -178,7 +178,24 @@ return new Response(JSON.stringify(state), {
 
 `/room/:roomId` 是前端路由。EdgeOne Makers 不会自动回退到 `index.html`，直接刷新或分享深链会 404。二选一：
 
-### 方案 A（推荐，最稳）：catch-all 函数
+### 方案 A（推荐，本项目实际采用）：edgeone.json 重写
+
+在项目根 `edgeone.json` 配置 SPA fallback（**字段的写法必须与下面完全一致，不要改写**；字段含义以官方文档为准）：
+
+```json
+{
+  "rewrites": [
+    { "source": "/*", "destination": "/index.html" }
+  ]
+}
+```
+
+> 此写法是平台**官方文档给出的 SPA fallback 精确形式**，语义是「**优先匹配项目中的其他路由（包括静态资源和函数），未命中任何路由时才返回 `/index.html`**」—— 因此 `/assets/*` 与 `/api/*` 都不会被误伤，**这是平台内建行为，不需要额外加请求头条件**。
+> ⚠️ **字段必须一字不差：`source` 为 `/*`、`destination` 为 `/index.html`。** 平台按「**该精确配置**」识别 SPA fallback；写成 `/(.*)` 之类的变体不会被识别为 fallback，而会作为普通重写规则生效。本项目的早期写法正是 `/(.*)` 加一个 `accept` 头条件，已于 2026-10-12 修正，理由与失效条件见 [`architecture/adr/ADR-0006`](architecture/adr/ADR-0006-spa-fallback-official-form.md)。
+> ⚠️ 另一处行为变化：**未命中的路径会返回首页 HTML 且状态码为 `200`（不再 404）**。所以排查「某个端点没命中」时，判据是 **`Content-Type` / body**，不能只看状态码 —— 只看 `200` 会把「路由坏了」当成「通过」。
+> 若字段与控制台/官方文档不一致，以官方为准，或改用方案 B。
+
+### 方案 B：catch-all 函数
 
 新建 `edge-functions/[[default]].ts`：
 
@@ -188,26 +205,12 @@ export function onRequest(context: EventContext) {
   // 仅对没有静态文件、也没有 api 文件的路径返回首页 HTML。
   const html = `<!doctype html>...`; // 实际部署时返回构建产物 dist/index.html 内容
   return new Response(html, {
-    headers: { 'Content-Type': 'text/html; charset=UTF-8' },
+    headers: { 'Content-Type': 'text/html' },
   });
 }
 ```
 
-> 注意：需要读取 `dist/index.html` 内容返回。可在构建后由函数读取（或用方案 B）。
-
-### 方案 B：edgeone.json 重写
-
-在项目根 `edgeone.json` 配置重写规则（字段以官方最新文档为准）：
-
-```json
-{
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
-```
-
-> 此写法对所有未命中路径回退到 `index.html`；静态资源（`/assets/*.js` 等）由平台优先以静态文件返回，不受影响。若你的 edgeone.json 字段与控制台/官方文档不一致，以官方为准，或优先用方案 A。
+> 注意：需要读取 `dist/index.html` 内容返回。可在构建后由函数读取，或优先用方案 A。
 
 ---
 
@@ -233,7 +236,7 @@ othello-online/
 │   ├── hooks/usePolling.ts / useBoardSound.ts
 │   ├── workers/ai.worker.ts     # AI 计算放 Web Worker，不阻塞主线程
 │   ├── utils/gameLogic.ts       # 纯 JS 游戏逻辑（前端与函数端共用）
-│   ├── utils/ai.ts / hints.ts / api.ts / player.ts / roomCode.ts / sound.ts / stats.ts / theme.ts
+│   ├── utils/ai.ts / hints.ts / api.ts / coords.ts / player.ts / roomCode.ts / sound.ts / stats.ts / theme.ts
 │   ├── test/setup.ts            # Vitest（jsdom + jest-dom）环境
 │   └── index.css                # 设计令牌（Tailwind v4 CSS-first）
 ├── edge-functions/

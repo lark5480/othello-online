@@ -1,45 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   applyMoveBoard,
   createInitialBoard,
-  BLACK,
   type Board as BoardType,
   type GameState,
-  type Move,
-  type Player,
+  type MoveWithPlayer,
 } from '../utils/gameLogic';
 import { moveToLabel } from '../utils/coords';
 import Board from './Board';
 import { CloseIcon, HistoryIcon } from './icons';
 
-interface Entry {
-  move: Move;
-  player: Player;
-}
-
 /**
- * 走子记录侧栏：随对局进行累计每一步坐标（从 board 上最后一手的颜色反推执子方，
- * 因此对跳过的回合同样准确）。点击某手可「回顾」该时刻的棋盘（通过重放重建，
- * 不影响实时对局）。联网 / 人机 / 本地双人模式通用。
+ * 走子记录侧栏：由服务端 state.moves（完整棋谱）直接派生，
+ * 因此刷新 / 断线重连后依然完整，且每手执子方由持久化字段给出、无需从棋盘反推。
+ * 点击某手可「回顾」该时刻的棋盘（通过重放重建，不影响实时对局）。
+ * 联网 / 人机 / 本地双人模式通用。
  */
 export default function MoveHistory({ state }: { state: GameState }) {
-  const [entries, setEntries] = useState<Entry[]>([]);
   const [review, setReview] = useState<number | null>(null);
-  const prevCount = useRef(0);
+  const entries = state.moves;
 
-  useEffect(() => {
-    const lm = state.lastMove;
-    if (state.moveCount > prevCount.current && lm) {
-      const mover: Player = state.board[lm.row][lm.col] === BLACK ? 'black' : 'white';
-      setEntries((e) => [...e, { move: lm, player: mover }]);
-    } else if (state.moveCount < prevCount.current) {
-      setEntries([]); // 重开：清空记录
-      setReview(null);
-    }
-    prevCount.current = state.moveCount;
-  }, [state]);
-
-  const reviewBoard: BoardType | null = review === null ? null : reconstruct(entries, review);
+  // 重开后棋谱为空，若仍停留在旧索引上会导致回顾越界，故夹到合法范围
+  const reviewIndex = review !== null && review < entries.length ? review : null;
+  const reviewBoard: BoardType | null = reviewIndex === null ? null : reconstruct(entries, reviewIndex);
 
   return (
     <div className="card p-4">
@@ -65,7 +48,7 @@ export default function MoveHistory({ state }: { state: GameState }) {
                 >
                   <span className="text-muted w-5 text-right tabular-nums">{i + 1}.</span>
                   <span className={`disc disc-mini ${e.player === 'black' ? 'disc-black' : 'disc-white'}`} />
-                  <span className="text-strong font-mono">{moveToLabel(e.move)}</span>
+                  <span className="text-strong font-mono">{moveToLabel(e)}</span>
                 </button>
               </li>
             ))}
@@ -73,7 +56,7 @@ export default function MoveHistory({ state }: { state: GameState }) {
         )}
       </div>
 
-      {review !== null && reviewBoard && entries[review] && (
+      {reviewIndex !== null && reviewBoard && entries[reviewIndex] && (
         <div
           className="overlay-bg fixed inset-0 z-20 flex items-center justify-center px-4"
           onClick={() => setReview(null)}
@@ -81,7 +64,7 @@ export default function MoveHistory({ state }: { state: GameState }) {
           <div className="card w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <span className="text-strong text-sm font-medium">
-                第 {review + 1} 手 · {moveToLabel(entries[review].move)}
+                第 {reviewIndex + 1} 手 · {moveToLabel(entries[reviewIndex])}
               </span>
               <button
                 type="button"
@@ -96,7 +79,7 @@ export default function MoveHistory({ state }: { state: GameState }) {
               <Board
                 board={reviewBoard}
                 validMoves={[]}
-                lastMove={entries[review].move}
+                lastMove={entries[reviewIndex]}
                 interactive={false}
                 showHints={false}
                 currentTurn={null}
@@ -118,10 +101,11 @@ export default function MoveHistory({ state }: { state: GameState }) {
 }
 
 /** 从初始棋盘重放前 index 手，重建当时局面 */
-function reconstruct(entries: Entry[], index: number): BoardType {
+function reconstruct(entries: MoveWithPlayer[], index: number): BoardType {
   let board = createInitialBoard();
   for (let i = 0; i <= index; i++) {
-    board = applyMoveBoard(board, entries[i].move.row, entries[i].move.col, entries[i].player);
+    const m = entries[i];
+    board = applyMoveBoard(board, m.row, m.col, m.player);
   }
   return board;
 }
