@@ -411,13 +411,15 @@ EdgeOne Makers 不会自动把未知前端路由回退到 `index.html`，需二�
 {
   "redirects": [],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html", "has": { "type": "header", "key": "accept", "value": "text/html" } }
+    { "source": "/*", "destination": "/index.html" }
   ]
 }
 ```
-（仅对 HTML 请求回退；静态资源如 `/assets/*.js` 不受影响）
+平台会将这一精确形式识别为 SPA fallback：请求**先匹配项目中的已有路由（含静态资源与函数）**，仅在未命中任何其他路由时才回退到 `/index.html`，交由前端路由处理。因此 `/assets/*.js`、`/api/*` 不会被误回退成 HTML，无需再靠请求头条件来区分。
 
-**方案 B：catch-all 函数** `edge-functions/[[default]].ts` 返回 `index.html` 内容（注意与 `/api/*` 路由不冲突）。
+> **变更说明**：本节此前推荐带 `has: { "key": "accept", "value": "text/html" }` 条件的写法（`/(.*)` + `has`）。该写法不在 `edgeone.json` 的文档字段面内，且 `/(.*)` 不在平台支持的 `source` 匹配形式内——一旦 `has` 被平台忽略，会退化成无条件的 `/(.*) → /index.html`，把静态资源也重写成 HTML。2026-10-12 经技术侧论证后修正为上述官方形式，依据见 `docs/architecture/adr/ADR-0006-spa-fallback-official-form.md`。**请勿再加回 `has` 条件。**
+
+**方案 B（备用）：catch-all 函数** `edge-functions/[[default]].ts` 返回 `index.html` 内容（注意与 `/api/*` 路由不冲突）。方案 A 已具备「静态资源与函数优先匹配」语义，正常情况下无需 B；仅当 A 在真实环境被证伪（深链仍 404）时，才改用 B 兜底（参见 ADR-0006 的「替代方案 C」与「失效条件」）。
 
 ---
 

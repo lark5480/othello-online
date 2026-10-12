@@ -42,14 +42,14 @@ server/mockApi.ts           Vite 中间件，本地免 EdgeOne 验证（复用 g
 e2e/                        Playwright 双窗口冒烟（room.spec.ts）
 scripts/                    类型剥离自测脚本
 docs/                       prd.md、deployment.md、ai-mode.md、competitive-analysis.md
-edgeone.json                SPA fallback 配置
+edgeone.json                SPA fallback 与缓存响应头配置
 ```
 
 ## 关键架构约束（改动前必读）
 
 1. **Edge Functions 是 V8 runtime，不能 import npm 包。** 游戏规则等纯逻辑必须写在 `src/utils/gameLogic.ts`（零依赖纯 TS/JS），Edge Functions 跨目录 `import` 它复用；不要在 edge-functions 里引入第三方库。
 2. **KV 仅 Edge Functions 可调用**，value 必须是字符串（JSON 序列化）；存在最终一致性（约数十秒延迟）。前端用 `currentTurn` + `updatedAt` 过滤陈旧数据（`Room.tsx` 的 `applyState`）。
-3. **SPA 必须配 fallback**：`/room/:roomId` 刷新会 404，已由 `edgeone.json` 的 rewrite 处理；本地由 Vite 自带 history fallback 覆盖。
+3. **SPA fallback 必须用平台精确形式**：`/room/:roomId` 刷新会 404，由 `edgeone.json` 的 SPA fallback 处理。写法必须一字不差为 `{ "source": "/*", "destination": "/index.html" }`——**不要加 `has` 条件**（它不在 `edgeone.json` 的字段面内，被平台忽略会静默退化成无条件 catch-all，把 `/assets/*` 也重写成 HTML）。未命中路径返回 HTML `200` 而非 404，故判据看 `Content-Type`/body。依据见 `docs/architecture/adr/ADR-0006-spa-fallback-official-form.md`；本地由 Vite 自带 history fallback 覆盖。
 4. **本地免 EdgeOne 验证**：`server/mockApi.ts` 仅在 dev/preview 挂载，端点形状与 Edge Functions 一致（含错误码与脱敏行为，改任一侧必须同步另一侧）。用户只需 `npm run dev` 即可开两个浏览器窗口对弈。**Edge Functions 的测试要走真实路由层**：用 `edge-functions/lib/router.ts` 的 `routeRequest(method, url, env, body)` 按 URL 分派（镜像平台文件路由与 `[roomId]` 动态段提取），不要直接调 handler 函数绕过 `context.params`（曾因此测试绿但生产 join 路由坏）。
 5. **落子提示（showHints）已解耦**：`Board` 中 `interactive`（可点击，按合法格）与 `isHint`（视觉，按合法格+开关）是两个独立集合。隐藏提示后棋盘仍需可点击——改提示逻辑时不要把它们重新绑死。`src/utils/hints.ts` 按模式分 localStorage key（联网默认关、solo/ai 默认开），并迁移旧全局键 `othello_show_hints`。
 6. **playerId 兼作落子凭证，绝不外发**：所有 API 响应中的 `state.players` 必须经 `toPublicState()`（gameLogic.ts）把双方 playerId 置 null——`GET /state` 是无鉴权的，泄漏 playerId 等于把落子权交给任何拿到房间码的人。前端识别自己是哪一方用 `player.ts` 的房间颜色记忆（`rememberRoomColor`/`recallRoomColor`），不要依赖服务端回传。
@@ -68,5 +68,6 @@ edgeone.json                SPA fallback 配置
 - 涉及提示/棋盘视觉：确认"关提示仍可落子"、最后落子标记（青色 `--last-move`）不与提示点（琥珀 `--hint`）混淆。
 - 部署相关改动：提醒用户用 `edgeone makers dev`(8088) 或 `edgeone makers deploy` 在真实环境验证 KV 与 fallback（本环境无法联网验证）。
 - 文档同步：改完代码后检查 `docs/`、`README.md`、`AGENTS.md` 是否有过时描述（文件/命令/接口/数据），同步更新或删除无效内容。
+- **改 `edgeone.json` 或构建配置后，必须回头核 `docs/release/go-live-checklist.md` 的「判据」，而不只是措辞**：这类改动会让验证文档的**判据本身失效**，不只是文案过期——原 B.4 的通过判据是五个状态码，配置变更后「未命中路径返回 HTML 200」，同一套判据会把「路由坏掉」看成「通过」。**路由类判据一律看 body 类型（`Content-Type`/是否合法 JSON），不只看状态码。**
 - **外部事实必须核验后入档**：写进 `docs/`、`README.md` 的任何外部仓库、版本号、数据，引用前须先核验其存在性与当前状态——首选 `gh api repos/<owner>/<repo>` 查存续与 `isFork`/`pushedAt`，读其 `package.json`/README 核验技术栈；无 `gh` 时用 GitHub MCP 或 web 检索代替。**曾因只检索未核验，把不存在的 `Captnjo/reversi` 写入竞品文档并引用 4 次。**
 - **调研先发现、后核验**：两步不可合并——语义检索只负责扩大候选集，核验负责剔除不存在 / 已归档 / fork 的项。调研方法与通道选型见 `docs/competitive-analysis.md` 文末附录。

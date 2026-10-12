@@ -180,17 +180,20 @@ return new Response(JSON.stringify(state), {
 
 ### 方案 A（推荐，本项目实际采用）：edgeone.json 重写
 
-在项目根 `edgeone.json` 配置重写规则（字段以官方最新文档为准）：
+在项目根 `edgeone.json` 配置 SPA fallback（**字段的写法必须与下面完全一致，不要改写**；字段含义以官方文档为准）：
 
 ```json
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/*", "destination": "/index.html" }
   ]
 }
 ```
 
-> 此写法对所有未命中路径回退到 `index.html`；静态资源（`/assets/*.js` 等）由平台优先以静态文件返回，不受影响。本项目 `edgeone.json` 已加 accept 头条件（仅 HTML 请求回退，见 PRD 10.4）。若字段与控制台/官方文档不一致，以官方为准，或改用方案 B。
+> 此写法是平台**官方文档给出的 SPA fallback 精确形式**，语义是「**优先匹配项目中的其他路由（包括静态资源和函数），未命中任何路由时才返回 `/index.html`**」—— 因此 `/assets/*` 与 `/api/*` 都不会被误伤，**这是平台内建行为，不需要额外加请求头条件**。
+> ⚠️ **字段必须一字不差：`source` 为 `/*`、`destination` 为 `/index.html`。** 平台按「**该精确配置**」识别 SPA fallback；写成 `/(.*)` 之类的变体不会被识别为 fallback，而会作为普通重写规则生效。本项目的早期写法正是 `/(.*)` 加一个 `accept` 头条件，已于 2026-10-12 修正，理由与失效条件见 [`architecture/adr/ADR-0006`](architecture/adr/ADR-0006-spa-fallback-official-form.md)。
+> ⚠️ 另一处行为变化：**未命中的路径会返回首页 HTML 且状态码为 `200`（不再 404）**。所以排查「某个端点没命中」时，判据是 **`Content-Type` / body**，不能只看状态码 —— 只看 `200` 会把「路由坏了」当成「通过」。
+> 若字段与控制台/官方文档不一致，以官方为准，或改用方案 B。
 
 ### 方案 B：catch-all 函数
 
