@@ -16,7 +16,7 @@ const STORAGE_ERROR = 'storage not configured';
 
 /** 存储未配置时给用户的友好提示（可直接玩人机对战 / 本地双人开玩） */
 export const STORAGE_HINT =
-  '在线对战后端存储(KV)尚未配置,暂时无法联机对战。可直接玩「人机对战」,或本地 npm run dev 双人开玩。';
+  '在线对战后端存储（KV）尚未配置，暂时无法联机对战。可直接玩「人机对战」，或本地 npm run dev 双人开玩。';
 
 export function isStorageError(e: unknown): boolean {
   return e instanceof ApiError && (e.status === 503 || e.message === STORAGE_ERROR);

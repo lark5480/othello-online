@@ -27,7 +27,7 @@ export default function Home() {
       rememberRoomColor(roomId, 'black'); // 创建者执黑
       navigate(`/room/${roomId}`);
     } catch (e) {
-      setError(isStorageError(e) ? STORAGE_HINT : '创建房间失败,请稍后重试');
+      setError(isStorageError(e) ? STORAGE_HINT : '创建房间失败，请稍后重试');
     } finally {
       setBusy(false);
     }
@@ -56,7 +56,7 @@ export default function Home() {
             ? '房间不存在'
             : msg === 'room full'
               ? '房间已满'
-              : '加入失败,请稍后重试'
+              : '加入失败，请稍后重试'
       );
     } finally {
       setBusy(false);

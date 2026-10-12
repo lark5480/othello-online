@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getThemePreference, setThemePreference, type ThemePreference } from '../utils/theme';
+import { MoonIcon, SunIcon, SystemThemeIcon } from './icons';
 
 const ORDER: ThemePreference[] = ['system', 'light', 'dark'];
 
@@ -8,6 +9,13 @@ const LABELS: Record<ThemePreference, string> = {
   light: '亮色',
   dark: '暗色',
 };
+
+/** 主题图标（内联 SVG，不用 emoji —— 见 AGENTS.md 代码约定） */
+function ThemeIcon({ pref, size = 14 }: { pref: ThemePreference; size?: number }) {
+  if (pref === 'light') return <SunIcon size={size} />;
+  if (pref === 'dark') return <MoonIcon size={size} />;
+  return <SystemThemeIcon size={size} />;
+}
 
 export default function ThemeToggle() {
   const [pref, setPref] = useState<ThemePreference>(() => getThemePreference());
@@ -31,11 +39,12 @@ export default function ThemeToggle() {
     <button
       type="button"
       onClick={cycle}
-      className="btn-ghost-border rounded-lg px-2.5 py-1 text-xs font-medium"
+      className="btn-ghost-border flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium"
       aria-label={`主题：${LABELS[pref]}`}
       title={`当前：${LABELS[pref]}（点击切换）`}
     >
-      {pref === 'system' ? '◐ 跟随系统' : pref === 'light' ? '☀️ 亮色' : '🌙 暗色'}
+      <ThemeIcon pref={pref} />
+      {LABELS[pref]}
     </button>
   );
 }
