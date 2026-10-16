@@ -70,11 +70,14 @@ src/                   前端源码
 └─ index.css           设计令牌 + 棋盘/棋子/提示样式
 edge-functions/        Edge Functions：create / join / [roomId]/{state, move, restart} + lib（router/kv/types）
 server/mockApi.ts      本地免 EdgeOne 验证的 Vite 中间件（内存 KV，端点与生产一致）
-e2e/                   Playwright 双窗口冒烟测试（room.spec.ts）
-scripts/               类型剥离自测脚本
+e2e/                   Playwright 双窗口 E2E：room.spec.ts（建房→对局）、reconnect.spec.ts（断线重连）+ helpers.ts
+scripts/               类型剥离自测脚本、serve-e2e.mjs（E2E 服务进程回收）
 .github/workflows/     CI（typecheck + 单测 + E2E）
-docs/                  prd.md、deployment.md、ai-mode.md、competitive-analysis.md
-edgeone.json           SPA fallback 配置
+docs/                  prd.md、deployment.md、ai-mode.md、competitive-analysis.md；
+                       architecture/（架构总览 + 6 ADR + 性能预算 + 资产审计）、release/（上线清单等）
+tests/playtest/        试玩手册、冒烟清单、观察记录表、缺陷报告模板、质量门结案报告
+CHANGELOG.md           版本变更记录（Keep a Changelog）
+edgeone.json           SPA fallback（官方精确形式）+ 缓存响应头配置
 ```
 
 ## 开发与测试

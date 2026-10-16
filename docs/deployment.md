@@ -226,35 +226,15 @@ export function onRequest(context: EventContext) {
 
 ---
 
-## 5. 项目结构（最终）
+## 5. 项目结构
 
-```
-othello-online/
-├── src/
-│   ├── pages/Home.tsx / Room.tsx / AIGame.tsx   # 首页 / 联机对局 / 人机对战
-│   ├── components/Board.tsx / Cell.tsx / GameInfo.tsx / MoveHistory.tsx / StatsPanel.tsx / ThemeToggle.tsx
-│   ├── hooks/usePolling.ts / useBoardSound.ts
-│   ├── workers/ai.worker.ts     # AI 计算放 Web Worker，不阻塞主线程
-│   ├── utils/gameLogic.ts       # 纯 JS 游戏逻辑（前端与函数端共用）
-│   ├── utils/ai.ts / hints.ts / api.ts / coords.ts / player.ts / roomCode.ts / sound.ts / stats.ts / theme.ts
-│   ├── test/setup.ts            # Vitest（jsdom + jest-dom）环境
-│   └── index.css                # 设计令牌（Tailwind v4 CSS-first）
-├── edge-functions/
-│   ├── lib/router.ts / kv.ts / types.ts
-│   └── api/room/
-│       ├── create.ts
-│       ├── join.ts
-│       ├── [roomId]/state.ts
-│       ├── [roomId]/move.ts
-│       └── [roomId]/restart.ts
-├── server/mockApi.ts            # 本地免 EdgeOne 的 Vite 中间件（内存 KV）
-├── e2e/                         # Playwright 双窗口冒烟测试
-├── .github/workflows/ci.yml     # typecheck + 单测 + E2E
-├── edgeone.json                 # SPA fallback 重写配置
-├── package.json
-├── vite.config.ts               # 含 @tailwindcss/vite + mockApi 中间件 + Vitest 配置
-└── index.html
-```
+完整的项目结构树以 [`README.md` 的「项目结构」](../README.md#项目结构) 为**唯一出处**（避免多处副本漂移）。部署需关注的目录：
+
+- `edge-functions/`：Edge Functions（V8 runtime），**目录即路由**；`lib/`（router / kv / types）为本地支撑。
+- `server/mockApi.ts`：本地免 EdgeOne 的 Vite 中间件（内存 KV，仅 dev/preview 挂载）。
+- `dist/`：`npm run build` 产物，平台部署的输出目录。
+- `edgeone.json`：SPA fallback（官方精确形式）+ 缓存响应头。
+- `.github/workflows/ci.yml`：CI（typecheck + 单测 + E2E）。
 
 ---
 
