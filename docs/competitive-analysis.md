@@ -1,5 +1,7 @@
 # 黑白棋在线对战（othello-online）· 竞品生态简报
 
+> **文档状态**：快照（2026-09-03）—— 竞品数据与本项目结论均为该时点实况，不追随后续改动；引用前须复核（本项目自身的过时结论已在下文就地标注）。
+>
 > 复核日期：2026-09-03（初版 2026-09-01，本次按 GitHub API 全量复核并重写结论）
 > 复核方式：GitHub GraphQL API 核验仓库存续 / 星标 / 活跃度 → 读取仓库 `package.json` 与 README 核验技术栈 → Exa 检索补齐生态（通道选型依据见[文末附录](#appendix)）
 > 适用范围：本仓库是**纯前端 + 自研多等级 AI，无引擎进程、无常驻服务端**。非同栈项目（Flutter / C++ / Python+pygame）不作为对标对象，仅列作体验参照。
@@ -110,8 +112,8 @@ Egaroucid 作者实测过 NNUE（将棋/国象的小网络评估）在黑白棋�
 | 部署成本 | **零常驻**（EdgeOne Makers 免费额度） | GitHub Pages（零成本） | 多数需常驻服务 |
 | AI | Minimax+αβ，4 档；位置权重+机动性；hard/master 迭代加深(800/1500ms)+残局精确 | 3 档；**hard = 定时迭代加深 + αβ + 共享评估**（与本项目 master 同构） | 多为贪心/随机或深度受限 αβ |
 | 安全 | `toPublicState()` 剥离 playerId；乐观锁 `expectedUpdatedAt` | 单机无此问题 | hobby 项目普遍未做隔离 |
-| 测试 | 13 文件 109 用例 + Playwright 双窗口 E2E + CI | **313 用例**（144 引擎 + 169 React）+ CI + badges | 多数零测试 |
-| 工程规范 | 有 AGENTS.md 约束与 4 份文档；**无 lint/prettier/commitlint/husky** | **husky + commitlint + eslint + prettier + type-check 全链路** | 多为单 README |
+| 测试 | 14 文件 132 用例 + Playwright 双窗口 E2E + CI | **313 用例**（144 引擎 + 169 React）+ CI + badges | 多数零测试 |
+| 工程规范 | 有 AGENTS.md 约束与多份文档（架构 / 发布 / 试玩）；**无 lint/prettier/commitlint/husky** | **husky + commitlint + eslint + prettier + type-check 全链路** | 多为单 README |
 | 社区资产 | **无 LICENSE / badges / CONTRIBUTING** | 有 deploy/test badges | — |
 
 ---
@@ -136,15 +138,16 @@ Egaroucid 作者实测过 NNUE（将棋/国象的小网络评估）在黑白棋�
 ### 6.2 功能完备度
 - **无棋类计时**（cozyGarage 有 4 种时限 + Fischer 加秒 + 超时判定 + 音频警告）；
 - **无撤销/重做**（cozyGarage 有完整走子历史 + 键盘快捷键）；
-- **无认输 / 对手离开检测 / 断线重连**：对手消失后本端只会持续轮询；
+- **无认输 / 对手离开检测**：对手消失后本端只会持续轮询；
 - **无 i18n**：UI 仅中文；
-- **无持久化**：刷新后无法恢复对局（cozyGarage 有 Persistence）。
+- **断线重连**：~~无~~ → 2026-10-12 起**已实现**（PRD R-05；`e2e/reconnect.spec.ts`）。刷新后凭本地 `playerId` 回到原对局，盘面与比分一致；
+- **对局持久化**：~~无（刷新后无法恢复对局）~~ → 2026-10-12 起**已实现**：棋谱随对局状态存服务端（`GameState.moves`），刷新 / 换设备重进棋谱完整（cozyGarage 的 Persistence 为本地实现）。
 
 ### 6.3 联机实时性（表述修正）
 `Room.tsx:95` 为 `pollEnabled = !myTurn`——**自己回合完全不轮询**，因此感知延迟只发生在"等待对手落子"时，最长约 2s（`playing` 间隔 2000ms；`waiting` 3000ms、`finished` 5000ms）。初版笼统写成"轮询带来 2–5s 延迟"不够精确，但对"等待时手感偏钝"的判断仍成立。
 
 ### 6.4 部署门槛
-`docs/deployment.md` 已记载 EdgeOne KV 内测/名单开放问题，未开通则 `/api/room/create` 直接 500。**该说法具时效性，引用前需重新向平台确认。**
+EdgeOne Makers 免费版永久提供（2026-09 核验）；KV 需在控制台**申请开通**再绑定项目变量（见 `deployment.md` §0.3）。未绑定 KV 时后端所有端点返回 `503`（`STORAGE_ERROR`），前端会引导改玩人机对战。**该流程具时效性，引用前需重新向平台确认。**
 
 ### 6.5 环境门槛（2026-09-01 刚踩过的坑）
 `jsdom@30` / `undici@8` 要求 Node `^22.22.2 || ^24.15.0 || >=26`。CI 曾配 Node 20，导致 `webidl.util.markAsUncloneable is not a function` 而整体崩溃。现已改为 Node 24，并在 `package.json` 声明 `engines`、README 标注版本要求。

@@ -336,32 +336,15 @@ function json(data: unknown, status = 200) {
 
 ### 10.1 项目结构
 
+**当前项目结构以 [`README.md` 的「项目结构」](../README.md#项目结构) 为唯一出处**，本节不再重复维护整棵树（避免多处副本漂移）。下方结构树为 PRD 撰写时的**初始规划**，仅供参考、不代表现状：
+
 ```
 othello-online/
 ├── src/                    # React 前端（Vite 构建到 dist/）
-│   ├── pages/
-│   │   ├── Home.tsx        # 首页
-│   │   ├── Room.tsx        # 游戏页（联机）
-│   │   └── AIGame.tsx     # 人机对战页（/ai，离线单机）
-│   ├── components/
-│   │   ├── Board.tsx       # 棋盘组件
-│   │   ├── Cell.tsx        # 格子组件
-│   │   └── GameInfo.tsx    # 状态信息
-│   ├── hooks/
-│   │   └── usePolling.ts   # 轮询 Hook
-│   └── utils/
-│       └── gameLogic.ts    # 前端展示用逻辑（与函数端共用纯 JS 逻辑）
+│   ├── pages/  components/  hooks/  utils/
 ├── edge-functions/         # Edge Functions（V8 runtime，可调用 KV）
-│   └── api/
-│       ├── room/
-│       │   ├── create.ts
-│       │   ├── join.ts
-│       │   ├── [roomId]/
-│       │   │   ├── state.ts
-│       │   │   ├── move.ts
-│       │   │   └── restart.ts
-│       │   └── [[default]].ts   # 可选 catch-all（SPA fallback 方案二）
-├── edgeone.json            # EdgeOne 项目配置（重定向/重写，CLI 自动生成）
+│   └── api/room/{create,join,[roomId]/{state,move,restart}}.ts
+├── edgeone.json            # EdgeOne 项目配置（重定向/重写）
 ├── package.json
 └── vite.config.ts          # 含 @tailwindcss/vite 插件
 ```
