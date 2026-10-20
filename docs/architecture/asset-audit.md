@@ -2,6 +2,7 @@
 
 > 审计时间：2026-10-12。范围：运行时依赖、构建链配置、项目资产清单、安全暴露面。
 > 审计方式：只读。未修改任何源码。版本信息经 `npm view <pkg> version` 实测（联网核验，核验日期同上）。
+> 引用其中行号 / 数字前请按当前代码复核（如 `gameLogic.ts` 在 BUG-01 棋谱持久化后整体行号已下移）。
 
 ---
 
@@ -117,7 +118,7 @@
 
 **代码事实**：`edge-functions/api/room/[roomId]/state.ts:7-19` —— 无任何鉴权，持有房间码即可读。
 
-**暴露的数据**：`toPublicState(state)`（`state.ts:18`）。而 `toPublicState` 在 `gameLogic.ts:312-314` 的实现是：
+**暴露的数据**：`toPublicState(state)`（`state.ts:18`）。而 `toPublicState` 在 `gameLogic.ts` 的实现是：
 
 ```ts
 export function toPublicState(state: GameState): GameState {

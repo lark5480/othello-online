@@ -343,7 +343,7 @@ othello-online/
 ├── src/                    # React 前端（Vite 构建到 dist/）
 │   ├── pages/  components/  hooks/  utils/
 ├── edge-functions/         # Edge Functions（V8 runtime，可调用 KV）
-│   └── api/room/{create,join,[roomId]/{state,move,restart}}.ts
+│   └── api/room/{create,[roomId]/{join,state,move,restart}}.ts
 ├── edgeone.json            # EdgeOne 项目配置（重定向/重写）
 ├── package.json
 └── vite.config.ts          # 含 @tailwindcss/vite 插件

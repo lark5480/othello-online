@@ -68,7 +68,7 @@ src/                   前端源码
 │                      api.ts / coords.ts / player.ts / roomCode.ts / sound.ts / stats.ts / theme.ts
 ├─ test/               setup.ts（Vitest：jsdom + jest-dom）
 └─ index.css           设计令牌 + 棋盘/棋子/提示样式
-edge-functions/        Edge Functions：create / join / [roomId]/{state, move, restart} + lib（router/kv/types）
+edge-functions/        Edge Functions：create.ts、[roomId]/{join, state, move, restart}.ts + lib（router/kv/http）+ 根级 types.ts
 server/mockApi.ts      本地免 EdgeOne 验证的 Vite 中间件（内存 KV，端点与生产一致）
 e2e/                   Playwright 双窗口 E2E：room.spec.ts（建房→对局）、reconnect.spec.ts（断线重连）+ helpers.ts
 scripts/               类型剥离自测脚本、serve-e2e.mjs（E2E 服务进程回收）
