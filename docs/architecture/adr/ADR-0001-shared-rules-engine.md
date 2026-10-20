@@ -28,10 +28,10 @@
 
 具体约束：
 
-1. **零依赖、零副作用**：文件头 `gameLogic.ts:1-8` 声明「不依赖任何外部库，可在 V8 / 浏览器 / Node 下直接运行」，所有导出函数不触碰 DOM、不读环境变量、不用模块级可变状态。
-2. **纯函数 + 返回新对象**：棋盘更新走 `applyMoveBoard`（`:188-203`），内部先 `cloneBoard`（`:68-70`）；状态更新走 `applyMoveToState`（`:247-305`），返回 `{ok:true, state}` 或 `{ok:false, status, error}` 判别联合。
-3. **房间状态层面的逻辑也放进来**，而非留在 Edge Functions：`joinState`（`:229`）、`restartState`（`:317`）、`createInitialState`（`:209`）都在 `gameLogic.ts` 内。`gameLogic.ts:205-207` 的注释明确了这一取舍的理由 —— 「便于单测」。
-4. **安全净化函数与规则同模块**：`toPublicState`（`:312-314`）放在规则模块内，其上方的注释（`:307-311`）把它定性为一条**硬性安全约束**：「playerId 兼作落子凭证，绝不能经任何 API 响应外泄」。让净化函数与状态定义物理同处，可以降低「新增端点时忘记调用」的概率。
+1. **零依赖、零副作用**：文件头注释（`gameLogic.ts` 顶部）声明「不依赖任何外部库，可在 V8 / 浏览器 / Node 下直接运行」，所有导出函数不触碰 DOM、不读环境变量、不用模块级可变状态。
+2. **纯函数 + 返回新对象**：棋盘更新走 `applyMoveBoard`，内部先 `cloneBoard`；状态更新走 `applyMoveToState`，返回 `{ok:true, state}` 或 `{ok:false, status, error}` 判别联合。
+3. **房间状态层面的逻辑也放进来**，而非留在 Edge Functions：`joinState`、`restartState`、`createInitialState` 都在 `gameLogic.ts` 内。该段上方的注释明确了这一取舍的理由 —— 「便于单测」。
+4. **安全净化函数与规则同模块**：`toPublicState` 放在规则模块内，其上方的注释把它定性为一条**硬性安全约束**：「playerId 兼作落子凭证，绝不能经任何 API 响应外泄」。让净化函数与状态定义物理同处，可以降低「新增端点时忘记调用」的概率。
 5. **Edge Functions 跨目录 import**：`edge-functions/api/room/create.ts:4` 直接 `import { createInitialState, toPublicState } from '../../../src/utils/gameLogic'`。路径穿过 `edge-functions/` 与 `src/` 两棵树。
 
 ## 后果
@@ -48,7 +48,7 @@
 
 - **`src/` 不再是「前端源码目录」，而是「共享源码目录」**。这是本决策最重要的架构含义：`src/utils/gameLogic.ts` 同时是前端代码和后端代码。含义之一是**它必须保持运行环境中立** —— 任何用到 DOM、`window`、`performance.now()` 的写法都会在 Edge 侧炸掉。当前代码确实守住了（`gameLogic.ts` 全文无任何浏览器 API）。
 - **Edge Functions 跨目录 import 破坏了目录的自洽性**。`edge-functions/` 名义上是独立的后端目录，却依赖了 `../src/` 的文件。若未来有人把 `edge-functions/` 整体抽成独立仓库或独立构建产物，这条 import 会立刻断裂。**缓解措施**：目前靠 `edge-functions/lib/router.ts:1-9` 的注释与 `edge-functions/flow.test.ts`（211 行端到端流程测试）守着 —— 跨目录 import 一旦断掉，测试会立刻红。这是一个**有意识的、靠测试兜底的耦合**，不是疏漏。
-- **没有类型层面的隔离**。`src/utils/gameLogic.ts` 与 Edge 之间只有 TypeScript 结构类型（`GameState`，`:27-41`）作为契约，没有独立的 `.d.ts` 或 schema（如 zod）做运行时校验。**判定：可接受** —— 状态数据来自自家 KV 而非不可信输入，且已在两端做了防御性处理（`kv.ts:34-39` 的 JSON.parse try/catch、`types.ts:6-10` 手写最小类型）。
+- **没有类型层面的隔离**。`src/utils/gameLogic.ts` 与 Edge 之间只有 TypeScript 结构类型（`GameState` 接口）作为契约，没有独立的 `.d.ts` 或 schema（如 zod）做运行时校验。**判定：可接受** —— 状态数据来自自家 KV 而非不可信输入，且已在两端做了防御性处理（`kv.ts:34-39` 的 JSON.parse try/catch、`types.ts:6-10` 手写最小类型）。
 
 **中性**：
 

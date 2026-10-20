@@ -230,7 +230,7 @@ export function onRequest(context: EventContext) {
 
 完整的项目结构树以 [`README.md` 的「项目结构」](../README.md#项目结构) 为**唯一出处**（避免多处副本漂移）。部署需关注的目录：
 
-- `edge-functions/`：Edge Functions（V8 runtime），**目录即路由**；`lib/`（router / kv / types）为本地支撑。
+- `edge-functions/`：Edge Functions（V8 runtime），**目录即路由**；路由为 `api/room/create.ts` 与 `api/room/[roomId]/{join,state,move,restart}.ts`（join 在 `[roomId]` 下）；`lib/`（router / kv / http）与根级 `types.ts` 为本地支撑。
 - `server/mockApi.ts`：本地免 EdgeOne 的 Vite 中间件（内存 KV，仅 dev/preview 挂载）。
 - `dist/`：`npm run build` 产物，平台部署的输出目录。
 - `edgeone.json`：SPA fallback（官方精确形式）+ 缓存响应头。

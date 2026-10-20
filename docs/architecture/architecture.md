@@ -211,7 +211,7 @@
 
 | 疑似风险 | 核验结论 |
 |---|---|
-| playerId 经 API 泄漏 → 可冒充对局双方 | ❌ **不成立**。`toPublicState`（`gameLogic.ts:312-314`）把 `players` 全置 null；在全部 5 个端点、6 个返回分支上 100% 生效（逐行核验：`create.ts:40`、`join.ts:39`、`join.ts:41`、`state.ts:18`、`move.ts:54`、`restart.ts:41`）。所有错误分支走 `http.ts:13-15`，只返回 `{error}` |
+| playerId 经 API 泄漏 → 可冒充对局双方 | ❌ **不成立**。`toPublicState`（`gameLogic.ts` 同名函数）把 `players` 全置 null；在全部 5 个端点、6 个返回分支上 100% 生效（逐行核验：`create.ts:40`、`join.ts:39`、`join.ts:41`、`state.ts:18`、`move.ts:54`、`restart.ts:41`）。所有错误分支走 `http.ts:13-15`，只返回 `{error}` |
 | `GET /state` 无鉴权导致状态外泄 | ❌ **不成立**。暴露的仅是公开观战信息（棋盘/回合/胜负），观战本就是设计意图（`GameInfo.tsx:34` 显式支持"观战中"）。房间码空间 `32^6 ≈ 10.9 亿`（`roomCode.ts:7`），不可枚举 |
 | 落子越界导致服务端崩溃 | ❌ **不成立**。`gameLogic.ts:262-271` 校验整数 + 范围，且注释记录了这是一个真实踩过的坑（`board[3.5]` 为 undefined，再取列会抛 TypeError） |
 
